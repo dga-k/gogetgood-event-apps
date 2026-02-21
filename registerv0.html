@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    <script src="auth.js"></script>
+    <title>ลงทะเบียน</title>
+    <style>
+        .ts-control { border-radius: 1rem !important; padding: 12px !important; background: #f8fafc !important; }
+        .bg-custom { background-size: cover; background-position: center; background-attachment: fixed; }
+    </style>
+</head>
+<body id="main-body" class="bg-custom min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white/90 backdrop-blur-xl w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-white/50 p-8 md:p-12">
+        <h1 id="title" class="text-3xl font-black text-slate-800 mb-8 text-center uppercase tracking-tight">ลงทะเบียน</h1>
+        <form id="form-container" class="space-y-5"></form>
+        <button onclick="submit()" class="w-full mt-10 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl transition-all">ยืนยันข้อมูล</button>
+    </div>
+
+    <script>
+       
+        const regId = new URLSearchParams(window.location.search).get('id');
+        let currentConfig = []; // ตัวแปรนี้ต้องอยู่นอกฟังก์ชันเพื่อให้ submit() เรียกใช้ได้
+        let rawThaiData = [];
+        let selects = {};
+
+        async function init() {
+            const { data: reg } = await _supabase.from('registrations').select('*').eq('id', regId).single();
+            if(!reg) return;
+            // --- บรรทัดสำคัญ: เก็บค่าไว้ในตัวแปร Global เพื่อให้ฟังก์ชัน submit() เรียกใช้ได้ ---
+            currentConfig = reg.form_config; 
+            // -----------------------------------------------------------------------
+            document.getElementById('title').innerText = reg.title;
+            if(reg.bg_url) document.getElementById('main-body').style.backgroundImage = `url('${reg.bg_url}')`;
+            document.getElementById('main-body').style.backgroundColor = reg.bg_color;
+
+            const container = document.getElementById('form-container');
+            for(const f of reg.form_config) {
+                container.innerHTML += renderHTML(f);
+            }
+
+            if(reg.form_config.some(f => f.type === 'address_th')) await initThaiAddress();
+        }
+
+        function renderHTML(f) {
+            const css = "w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-indigo-500 transition-all";
+            const reqAttr = f.is_required ? 'required' : '';
+            const reqStar = f.is_required ? '<span class="text-red-500">*</span>' : '';
+            if(f.type === 'text' || f.type === 'number') {
+                return `<div><label class="block text-xs font-bold text-slate-400 mb-2 ml-2 uppercase">${f.label}${reqStar}</label>
+                        <input type="${f.type}" id="${f.id}" class="${css}" placeholder="กรอกข้อมูล..." ${reqAttr}></div>`;
+            }
+            if(f.type === 'radio') {
+                return `<div><label class="block text-xs font-bold text-slate-400 mb-2 ml-2 uppercase">${f.label}${reqStar}</label>
+                        <div class="flex gap-6 p-2">${f.options.map(o => `<label class="flex items-center gap-2 font-bold text-slate-600"><input type="radio" name="${f.id}" value="${o}" class="w-5 h-5 accent-indigo-600"> ${o}</label>`).join('')}</div></div>`;
+            }
+            if (f.field_type === 'select') {
+                return `
+                    <div class="space-y-2">
+                        <label class="font-bold text-slate-700">${f.label} ${reqStar}</label>
+                        <select name="${f.label}" ${reqAttr} class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">-- กรุณาเลือก --</option>
+                            ${f.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                        </select>
+                    </div>`;
+            }
+            if(f.type === 'address_th') {
+                return `<div class="space-y-4 pt-4 border-t">
+                    <select id="pv" placeholder="ค้นหาจังหวัด..."></select>
+                    <select id="am" placeholder="ค้นหาอำเภอ..." disabled></select>
+                    <select id="tb" placeholder="ค้นหาตำบล..." disabled></select>
+                </div>`;
+            }
+            return '';
+        }
+
+        async function initThaiAddress() {
+        try {
+            // 1. ข้อมูล Hardcode (โครงสร้างแบบ Nest)
+            let data = [
+                {
+                    name: "กรุงเทพมหานคร",
+                    ams: [
+                        { name: "เขตพระนคร", tbs: ["พระบรมมหาราชวัง", "วังบูรพาภิรมย์", "วัดราชบพิธ"] },
+                        { name: "เขตบางรัก", tbs: ["มหาพฤฒาราม", "สีลม", "สุริยวงศ์"] }
+                    ]
+                },
+                {
+                    name: "สมุทรปราการ",
+                    ams: [
+                        { name: "เมืองสมุทรปราการ", tbs: ["ปากน้ำ", "ท้ายบ้าน", "บางเมือง"] },
+                        { name: "พระประแดง", tbs: ["ตลาด", "บางพึ่ง", "บางครุ"] }
+                    ]
+                }
+            ];
+
+            // 2. กำหนดให้ rawThaiData เท่ากับ data โดยตรง (เพราะโครงสร้างตรงกันแล้ว)
+            rawThaiData = data;
+
+            // 3. เรียงลำดับจังหวัด (ก-ฮ)
+            rawThaiData.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+            // 4. ล้างตัวเลือกเก่า (ถ้ามี) เพื่อป้องกัน TomSelect ซ้ำซ้อน
+            if (selects.pv) { selects.pv.destroy(); selects.am.destroy(); selects.tb.destroy(); }
+
+            // 5. เริ่มต้น TomSelect
+            selects.pv = new TomSelect("#pv", { 
+                onChange: val => updateAm(val),
+                placeholder: "🔍 ค้นหาจังหวัด...",
+                maxOptions: 100
+            });
+            selects.am = new TomSelect("#am", { 
+                onChange: val => updateTb(val),
+                placeholder: "🔍 ค้นหาอำเภอ..." 
+            });
+            selects.tb = new TomSelect("#tb", {
+                placeholder: "🔍 ค้นหาตำบล..."
+            });
+
+            // 6. เติมรายชื่อจังหวัดเข้าสู่ช่องเลือก
+            rawThaiData.forEach(p => {
+                selects.pv.addOption({ value: p.name, text: p.name });
+            });
+
+            console.log("โหลดข้อมูลสำเร็จ:", rawThaiData);
+
+        } catch (err) {
+            console.error("เกิดข้อผิดพลาดในการโหลดที่อยู่:", err);
+        }
+}
+        function updateAm(pvName) {
+            selects.am.clearOptions(); selects.am.clear(); selects.am.disable();
+            selects.tb.clearOptions(); selects.tb.clear(); selects.tb.disable();
+            if(!pvName) return;
+            const p = rawThaiData.find(x => x.name === pvName);
+            p.ams.forEach(a => selects.am.addOption({ value: a.name, text: a.name }));
+            selects.am.enable();
+        }
+
+        function updateTb(amName) {
+            selects.tb.clearOptions(); selects.tb.clear(); selects.tb.disable();
+            if(!amName) return;
+            const p = rawThaiData.find(x => x.name === selects.pv.getValue());
+            const a = p.ams.find(x => x.name === amName);
+            a.tbs.forEach(t => selects.tb.addOption({ value: t, text: t }));
+            selects.tb.enable();
+        }
+        // --- 2. ปรับปรุงฟังก์ชัน submit ให้รู้จัก currentConfig และเก็บค่าให้ครบ ---
+async function submit() {
+    try {
+        const submissionData = {};
+        const form = document.getElementById('form-container');
+            // ใช้ Built-in validation ของ Browser
+        if (!form.checkValidity()) {
+            form.reportValidity(); // จะเด้งเตือน "Please fill out this field" ให้เอง
+            return;
+        }
+        // วนลูปตาม Config ที่ดึงมาจาก DB เพื่อเก็บค่าจาก Input ต่างๆ
+        currentConfig.forEach(f => {
+            if (f.type === 'radio') {
+                // สำหรับ Radio (เพศ)
+                const checked = document.querySelector(`input[name="${f.id}"]:checked`);
+                submissionData[f.id] = checked ? checked.value : null;
+            } 
+            else if (f.type === 'address_th') {
+                // สำหรับที่อยู่ (ดึงจาก Tom Select Instance)
+                submissionData['province'] = selects.pv.getValue();
+                submissionData['amphure'] = selects.am.getValue();
+                submissionData['tambon'] = selects.tb.getValue();
+            } 
+            else {
+                // สำหรับ Text / Number
+                const el = document.getElementById(f.id);
+                if (el) submissionData[f.id] = el.value;
+            }
+        });
+
+        // 1. ตรวจสอบความถูกต้องเบื้องต้น (Optional)
+        if (Object.values(submissionData).some(v => v === "" || v === null)) {
+            alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+            return;
+        }
+        const phoneToCheck = submissionData['phone']; 
+
+        // 2. ไปถาม Supabase ว่ามีใครเคยใช้เบอร์นี้ในงานนี้หรือยัง
+        const { data: existing } = await _supabase
+            .from('registration_submissions')
+            .select('id')
+            .eq('registration_id', regId)
+            .filter('submitted_data->>phone', 'eq', phoneToCheck);
+
+        // 3. ถ้าเจอข้อมูลเดิม ให้หยุดการทำงานและแจ้งเตือน
+        if (existing && existing.length > 0) {
+            alert("⚠️ ขออภัย: เบอร์โทรศัพท์นี้ได้ลงทะเบียนในงานนี้ไปแล้วครับ");
+            return; // ออกจากฟังก์ชัน ไม่บันทึกซ้ำ
+        }
+        // บันทึกลง Supabase
+        const { data, error } = await _supabase
+            .from('registration_submissions')
+            .insert([
+                { 
+                    registration_id: regId, 
+                    submitted_data: submissionData 
+                }
+            ]);
+
+        if (error) throw error;
+
+        alert("✅ ลงทะเบียนเรียบร้อยแล้ว ขอบคุณครับ!");
+        location.reload(); // รีโหลดหน้าเว็บเพื่อล้างฟอร์ม
+
+    } catch (err) {
+        console.error("Submit Error:", err);
+        alert("เกิดข้อผิดพลาด: " + err.message);
+    }
+}
+        init();
+    </script>
+</body>
+</html>

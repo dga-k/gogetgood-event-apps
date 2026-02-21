@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Scoreboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <style>
+       /* แก้ไขในส่วน <style> */
+
+        body { 
+             background-image: url('Challenge-02.png'); 
+            color: white; 
+            font-family: 'Kanit', sans-serif; 
+            margin: 0; 
+            min-height: 100vh;
+            /* ลบ overflow: hidden ออก */
+        }
+
+        h1 {
+            position: sticky; /* ทำให้หัวข้ออยู่กับที่เวลาเลื่อน */
+            top: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #chart-container { 
+            display: flex; 
+            align-items: flex-end; 
+            justify-content: flex-start; /* เปลี่ยนจาก center เป็น start เพื่อให้เลื่อนจากซ้ายไปขวา */
+            height: 70vh; 
+            gap: 25px; 
+            padding: 50px; 
+            
+            /* ❗️ ส่วนสำคัญ: เปิดการเลื่อนแนวนอน */
+            overflow-x: auto; 
+            overflow-y: hidden;
+            white-space: nowrap; /* ป้องกันแท่งกราฟตกบรรทัด */
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* ปรับความกว้างของแท่งกราฟให้คงที่ ไม่โดนบีบ */
+        .bar-wrapper { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            width: 100px; /* กำหนดความกว้างที่แน่นอน */
+            flex-shrink: 0; /* ❗️ ห้ามไม่ให้แท่งกราฟโดนบีบขนาด */
+            transition: all 0.5s; 
+        }
+
+        /* ปรับแต่ง Scrollbar ให้ดูสวยงาม (สำหรับ Chrome/Safari) */
+        #chart-container::-webkit-scrollbar {
+            height: 10px;
+        }
+        #chart-container::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        #chart-container::-webkit-scrollbar-thumb {
+            background: #00ffcc;
+            border-radius: 5px;
+        }
+        .bar { width: 100%; background: linear-gradient(to top, #ffd700, #fff); border-radius: 10px 10px 0 0; position: relative; min-height: 10px; transition: height 0.5s ease-out; }
+        .score { position: absolute; top: -30px; width: 100%; text-align: center; font-weight: bold; color: #ffd700; }
+        .team-name { margin-top: 15px; text-align: center; font-size: 0.9rem; background: #004d33; padding: 5px; border-radius: 5px; width: 100%; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align:center; color:#00ffcc; padding-top:20px;">LIVE SCOREBOARD</h1>
+    <div id="chart-container"></div>
+
+    <script>
+
+        async function fetchAndRender() {
+            const { data: events } = await _supabase.from('events_festival').select('id').order('created_at', {ascending: false}).limit(1);
+            if(events.length === 0) return;
+
+            const { data: teams } = await _supabase.from('teams').select('*').eq('event_id', events[0].id).order('score', {ascending: false});
+            
+            const container = document.getElementById('chart-container');
+            const maxScore = Math.max(...teams.map(t => t.score)) || 1;
+            
+            container.innerHTML = teams.map(t => {
+                const height = (t.score / maxScore) * 400;
+                return `
+                    <div class="bar-wrapper">
+                        <div class="bar" style="height: ${height}px">
+                            <div class="score">${t.score}</div>
+                        </div>
+                        <div class="team-name">${t.team_name}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ฟังการเปลี่ยนแปลงข้อมูลแบบ Real-time
+        _supabase.channel('any')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
+            fetchAndRender();
+        })
+        .subscribe();
+
+        fetchAndRender();
+    </script>
+</body>
+</html>

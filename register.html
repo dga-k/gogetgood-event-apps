@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <title>Registration - RegisPro</title>
+</head>
+<body class="bg-indigo-600 min-h-screen flex items-center justify-center p-4">
+
+    <div id="main-card" class="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden p-8 md:p-12 animate-in fade-in zoom-in duration-500">
+        
+        <div id="loading-state" class="text-center py-20">
+            <div class="animate-spin text-4xl mb-4">🌀</div>
+            <p class="text-slate-400 font-bold">กำลังโหลดข้อมูลฟอร์ม...</p>
+        </div>
+
+        <div id="form-container" class="hidden">
+            <header class="text-center mb-10">
+                <h1 id="project-title" class="text-3xl font-black text-slate-800 mb-2 italic">ชื่อโครงการ</h1>
+                <p class="text-slate-400 font-medium">กรุณากรอกข้อมูลให้ครบถ้วนเพื่อลงทะเบียน</p>
+            </header>
+
+            <form id="reg-form" onsubmit="saveSubmission(event)" class="space-y-6">
+                <div id="dynamic-fields" class="space-y-5"></div>
+
+                <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xl shadow-xl shadow-indigo-100 hover:bg-slate-900 transition-all transform active:scale-95">
+                    ลงทะเบียนตอนนี้ 🚀
+                </button>
+            </form>
+        </div>
+
+        <div id="success-state" class="hidden text-center py-10">
+            <div class="text-6xl mb-6">✅</div>
+            <h2 class="text-3xl font-black text-slate-800 mb-2">ลงทะเบียนสำเร็จ!</h2>
+            <p class="text-slate-500 mb-8">ข้อมูลของคุณถูกบันทึกเรียบร้อยแล้ว ขอให้โชคดีกับการสุ่มรางวัล</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Supabase Config ---
+       
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const regId = urlParams.get('id');
+        let currentConfig = [];
+
+        // 1. เริ่มโหลดข้อมูลโปรเจกต์
+        async function initForm() {
+            if (!regId) {
+                alert("ไม่พบรหัสโครงการ");
+                return;
+            }
+
+            // เช็ค LocalStorage ก่อน (กันคนเดิมลงซ้ำในเครื่องเดิม)
+            if (localStorage.getItem(`reg_done_${regId}`)) {
+                showState('success');
+                return;
+            }
+
+            const { data, error } = await _supabase
+                .from('registrations')
+                .select('*')
+                .eq('id', regId)
+                .single();
+
+            if (error || !data) {
+                document.getElementById('loading-state').innerHTML = "❌ ไม่พบข้อมูลฟอร์มนี้";
+                return;
+            }
+
+            document.getElementById('project-title').innerText = data.title;
+            currentConfig = data.form_config; // ดึงลำดับและ Required จาก JSON
+            renderFields(currentConfig);
+            showState('form');
+        }
+
+        // 2. วาดฟิลด์ตามลำดับที่ Admin จัดไว้
+        function renderFields(config) {
+            const container = document.getElementById('dynamic-fields');
+            container.innerHTML = config.map(f => {
+                const isReq = f.is_required ? 'required' : '';
+                const star = f.is_required ? '<span class="text-rose-500">*</span>' : '';
+
+                // แบบ Dropdown
+                if (f.field_type === 'select') {
+                    return `
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-2">${f.label} ${star}</label>
+                            <select name="${f.label}" ${isReq} class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="">-- กรุณาเลือก --</option>
+                                ${f.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                            </select>
+                        </div>`;
+                }
+
+                // แบบ Radio
+                if (f.field_type === 'radio') {
+                    return `
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-3">${f.label} ${star}</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                ${f.options.map(opt => `
+                                    <label class="flex items-center p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 cursor-pointer has-[:checked]:bg-indigo-50 has-[:checked]:ring-indigo-500 transition-all">
+                                        <input type="radio" name="${f.label}" value="${opt}" ${isReq} class="w-4 h-4 accent-indigo-600">
+                                        <span class="ml-3 font-bold text-slate-600">${opt}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                }
+
+                // แบบ Text หรือ Number
+                return `
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-2">${f.label} ${star}</label>
+                        <input type="${f.field_type === 'address_th' ? 'text' : f.field_type}" 
+                               name="${f.label}" 
+                               placeholder="ระบุ${f.label}..."
+                               ${isReq} 
+                               class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    </div>`;
+            }).join('');
+        }
+
+        // 3. บันทึกข้อมูล
+        async function saveSubmission(e) {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+            const submissionData = {};
+
+            // ตรวจสอบ IP เพื่อป้องกันการปั๊ม (Optional)
+           // const ipRes = await fetch('https://api.ipify.org?format=json');
+           // const { ip } = await ipRes.json();
+
+            // รวบรวมข้อมูล
+            currentConfig.forEach(f => {
+                submissionData[f.label] = formData.get(f.label);
+            });
+
+            // ตรวจสอบข้อมูลซ้ำในเบอร์โทร (ถ้าฟิลด์ชื่อ "เบอร์โทรศัพท์" มีอยู่)
+            if (submissionData['เบอร์โทรศัพท์']) {
+                const { data: exist } = await _supabase
+                    .from('registration_submissions')
+                    .select('id')
+                    .eq('registration_id', regId)
+                    .filter('submitted_data->>เบอร์โทรศัพท์', 'eq', submissionData['เบอร์โทรศัพท์']);
+                
+                if (exist && exist.length > 0) {
+                    alert("⚠️ เบอร์โทรศัพท์นี้เคยลงทะเบียนไปแล้วครับ");
+                    return;
+                }
+            }
+
+            // บันทึกเข้า Database
+            const { error } = await _supabase.from('registration_submissions').insert([{
+                registration_id: regId,
+                submitted_data: submissionData
+               // ip_address: ip
+            }]);
+
+            if (!error) {
+                localStorage.setItem(`reg_done_${regId}`, 'true');
+                showState('success');
+            } else {
+                alert("เกิดข้อผิดพลาด: " + error.message);
+            }
+        }
+
+        // Helper: เปลี่ยนหน้าจอ
+        function showState(state) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('form-container').classList.toggle('hidden', state !== 'form');
+            document.getElementById('success-state').classList.toggle('hidden', state !== 'success');
+        }
+
+        initForm();
+    </script>
+</body>
+</html>

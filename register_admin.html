@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+     <script src="auth.js"></script>
+    <title>RegisPro Admin - High Performance</title>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 flex min-h-screen font-sans">
+
+    <aside class="w-72 bg-slate-900 text-slate-300 flex flex-col p-6 fixed h-full shadow-2xl z-50">
+        <div class="mb-10 px-2 text-white text-2xl font-black italic tracking-tighter">REGIS<span class="text-indigo-500">PRO</span></div>
+        <nav class="space-y-1 flex-1">
+            <button onclick="switchTab('master')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold active-tab"><span>📁</span> Master Data</button>
+            <button onclick="switchTab('config')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>🛠</span> Form Builder</button>
+            <button onclick="switchTab('links')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>🔗</span> My Projects</button>
+            <button onclick="switchTab('luckydraw')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>🎁</span> Lucky Draw</button>
+        </nav>
+    </aside>
+
+    <main class="ml-72 flex-1 p-10">
+        <section id="tab-master" class="tab-content hidden animate-in fade-in duration-500">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black text-slate-800">จัดการ Master Data</h2>
+                <button onclick="openFieldModal()" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100">+ เพิ่มฟิลด์ใหม่</button>
+            </div>
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-400 text-xs font-black uppercase">
+                        <tr><th class="p-5">Label</th><th class="p-5">Type</th><th class="p-5">Options</th><th class="p-5 text-center">Action</th></tr>
+                    </thead>
+                    <tbody id="master-table-body" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="tab-config" class="tab-content hidden animate-in fade-in">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black text-slate-800">สร้างฟอร์มใหม่</h2>
+                <div class="flex gap-3">
+                    <input type="text" id="reg-title" class="p-4 bg-white rounded-2xl ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 w-64 shadow-sm" placeholder="ชื่อโครงการ...">
+                    <button onclick="saveRegistration()" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">บันทึกโครงการ</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-black text-slate-400 uppercase mb-6 tracking-widest">1. เลือกฟิลด์จาก Master</h3>
+                    <div id="master-selection-list" class="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-2"></div>
+                </div>
+
+                <div class="bg-indigo-50/50 p-8 rounded-[2.5rem] border-2 border-dashed border-indigo-200">
+                    <h3 class="text-sm font-black text-indigo-500 uppercase mb-6 tracking-widest">2. จัดลำดับและตั้งค่า (Required รายงาน)</h3>
+                    <div id="selected-sortable-list" class="space-y-3">
+                        <div class="text-center py-10 text-slate-400 font-bold">ยังไม่มีฟิลด์ที่เลือก</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-links" class="tab-content hidden animate-in fade-in">
+            <h2 class="text-3xl font-black text-slate-800 mb-8">ลิ้งก์และรายงาน</h2>
+            <div id="project-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+        </section>
+
+        <section id="tab-luckydraw" class="tab-content hidden animate-in fade-in">
+            <h2 class="text-3xl font-black text-slate-800 mb-8">จัดการระบบสุ่มรางวัล</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 h-fit">
+                    <label class="block text-xs font-black text-slate-400 mb-2 uppercase">เลือกโปรเจกต์</label>
+                    <select id="draw-project-select" onchange="prepareLuckyDrawFields()" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 mb-6"></select>
+                    <label class="block text-xs font-black text-slate-400 mb-2 uppercase">ฟิลด์ที่จะแสดงผล</label>
+                    <div id="draw-field-options" class="space-y-2 mb-8 p-4 bg-slate-100 rounded-2xl"></div>
+                    <button onclick="openLuckyDrawWindow()" class="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">🚀 เปิดหน้าสุ่มรางวัล</button>
+                </div>
+                <div class="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-black text-slate-800">ประวัติผู้โชคดี</h3>
+                        <button onclick="resetAllWinnersAdmin()" class="text-xs font-bold text-red-500 uppercase">ล้างประวัติทั้งหมด</button>
+                    </div>
+                    <div class="overflow-hidden rounded-2xl border border-slate-100">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-400 font-black uppercase">
+                                <tr><th class="p-4">ผู้ชนะ</th><th class="p-4">ฟิลด์</th><th class="p-4 text-center">ลบ</th></tr>
+                            </thead>
+                            <tbody id="admin-winner-history" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl">
+            <h3 class="text-2xl font-black mb-6 text-slate-800 text-center">ตั้งค่า Master Field</h3>
+            <div class="space-y-4">
+                <input type="hidden" id="field-id">
+                <input type="text" id="field-label" placeholder="ชื่อหัวข้อ (เช่น ไซส์เสื้อ)" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-500">
+                <select id="field-type" onchange="toggleOpt()" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+                    <option value="text">ข้อความ (Text)</option>
+                    <option value="number">ตัวเลข (Number)</option>
+                    <option value="radio">ตัวเลือก (Radio)</option>
+                    <option value="select">รายการเลือก (Dropdown)</option>
+                    <option value="address_th">ที่อยู่ประเทศไทย</option>
+                </select>
+                <div id="opt-wrap" class="hidden">
+                    <input type="text" id="field-opts" placeholder="ตัวเลือก (แยกด้วยคอมม่า , )" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+                </div>
+            </div>
+            <div class="flex gap-4 mt-10">
+                <button onclick="closeModal()" class="flex-1 font-bold text-slate-400">ยกเลิก</button>
+                <button onclick="submitField()" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100">บันทึกข้อมูล</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Supabase Config (ต้องใส่ URL/Key ของคุณ) ---
+     
+
+        let masterFields = [];
+        let selectedFields = [];
+
+        async function switchTab(name) {
+            document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
+            document.getElementById('tab-' + name).classList.remove('hidden');
+            if(name === 'master') loadMaster();
+            if(name === 'config') loadBuilder();
+            if(name === 'links') loadProjects();
+            if(name === 'luckydraw') loadLuckyDrawProjects();
+        }
+
+        // --- Master Logic ---
+        async function loadMaster() {
+            const { data } = await _supabase.from('form_fields').select('*').order('created_at', {ascending: true});
+            masterFields = data || [];
+            document.getElementById('master-table-body').innerHTML = masterFields.map(f => `
+                <tr class="hover:bg-slate-50 transition-all">
+                    <td class="p-5 font-bold text-slate-700">${f.label}</td>
+                    <td class="p-5 text-indigo-500 font-bold text-xs uppercase">${f.field_type}</td>
+                    <td class="p-5 text-slate-400 text-xs">${f.options.length ? f.options.join(', ') : '-'}</td>
+                    <td class="p-5 text-center flex justify-center gap-3">
+                        <button onclick='editField(${JSON.stringify(f)})' class="text-amber-500 font-bold hover:underline">Edit</button>
+                        <button onclick="delField('${f.id}')" class="text-red-400 font-bold hover:underline">Del</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function submitField() {
+            const id = document.getElementById('field-id').value;
+            const payload = { 
+                label: document.getElementById('field-label').value, 
+                field_type: document.getElementById('field-type').value,
+                options: document.getElementById('field-opts').value.split(',').map(s => s.trim()).filter(s => s)
+            };
+            if(id) await _supabase.from('form_fields').update(payload).eq('id', id);
+            else await _supabase.from('form_fields').insert([payload]);
+            closeModal(); loadMaster();
+        }
+
+        // --- Form Builder Logic (NEW) ---
+        async function loadBuilder() {
+            if(!masterFields.length) await loadMaster();
+            document.getElementById('master-selection-list').innerHTML = masterFields.map(f => `
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-indigo-300 group transition-all">
+                    <div>
+                        <div class="font-bold text-slate-700">${f.label}</div>
+                        <div class="text-[10px] text-slate-400 font-black uppercase">${f.field_type}</div>
+                    </div>
+                    <button onclick='addFieldToConfig(${JSON.stringify(f)})' class="bg-white w-10 h-10 rounded-xl shadow-sm text-indigo-500 font-black hover:bg-indigo-500 hover:text-white transition-all">+</button>
+                </div>
+            `).join('');
+            renderSelectedList();
+        }
+
+        function addFieldToConfig(field) {
+            if(selectedFields.find(f => f.id === field.id)) return;
+            selectedFields.push({ ...field, is_required: false });
+            renderSelectedList();
+        }
+
+        function renderSelectedList() {
+            const list = document.getElementById('selected-sortable-list');
+            if(!selectedFields.length) {
+                list.innerHTML = `<div class="text-center py-10 text-slate-400 font-bold border-2 border-dashed border-slate-200 rounded-3xl">ยังไม่มีฟิลด์ที่เลือก</div>`;
+                return;
+            }
+            list.innerHTML = selectedFields.map((f, i) => `
+                <div class="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 animate-in slide-in-from-right-5">
+                    <div class="flex flex-col gap-1">
+                        <button onclick="moveField(${i}, -1)" class="text-slate-300 hover:text-indigo-600 text-xs">▲</button>
+                        <button onclick="moveField(${i}, 1)" class="text-slate-300 hover:text-indigo-600 text-xs">▼</button>
+                    </div>
+                    <div class="flex-1 font-bold text-slate-700">${f.label}</div>
+                    <label class="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl cursor-pointer ring-1 ring-slate-100">
+                        <input type="checkbox" ${f.is_required ? 'checked' : ''} onchange="selectedFields[${i}].is_required = this.checked" class="w-4 h-4 accent-rose-500">
+                        <span class="text-[10px] font-black text-slate-500 uppercase">Required</span>
+                    </label>
+                    <button onclick="selectedFields.splice(${i}, 1); renderSelectedList();" class="text-slate-300 hover:text-red-500 text-xl font-bold px-2">×</button>
+                </div>
+            `).join('');
+        }
+
+        function moveField(i, dir) {
+            const j = i + dir;
+            if(j < 0 || j >= selectedFields.length) return;
+            [selectedFields[i], selectedFields[j]] = [selectedFields[j], selectedFields[i]];
+            renderSelectedList();
+        }
+
+        async function saveRegistration() {
+            const title = document.getElementById('reg-title').value;
+            if(!title || !selectedFields.length) return alert("กรุณากรอกชื่อโครงการและเลือกฟิลด์");
+            const { error } = await _supabase.from('registrations').insert([{ title, form_config: selectedFields }]);
+            if(!error) { alert("สร้างโปรเจกต์สำเร็จ!"); selectedFields = []; document.getElementById('reg-title').value = ""; switchTab('links'); }
+        }
+
+        // --- Lucky Draw Logic ---
+        async function loadLuckyDrawProjects() {
+            const { data } = await _supabase.from('registrations').select('*').order('created_at', {ascending: false});
+            const select = document.getElementById('draw-project-select');
+            select.innerHTML = '<option value="">-- เลือกโปรเจกต์ --</option>' + data.map(p => `<option value="${p.id}" data-config='${JSON.stringify(p.form_config)}'>${p.title}</option>`).join('');
+        }
+
+        function prepareLuckyDrawFields() {
+            const option = document.getElementById('draw-project-select').selectedOptions[0];
+            if(!option.value) return;
+            const config = JSON.parse(option.getAttribute('data-config'));
+            document.getElementById('draw-field-options').innerHTML = config.map(f => `
+                <label class="flex items-center gap-2 font-bold text-slate-600 text-sm cursor-pointer">
+                    <input type="radio" name="draw-field" value="${f.label}" class="w-4 h-4 accent-indigo-600" checked> ${f.label}
+                </label>
+            `).join('');
+            loadWinnerHistory(option.value);
+        }
+
+        async function loadWinnerHistory(regId) {
+            const { data } = await _supabase.from('lucky_winners').select('*').eq('registration_id', regId).order('created_at', {ascending: false});
+            document.getElementById('admin-winner-history').innerHTML = (data || []).map(w => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-4 font-bold text-slate-800">${w.winner_name}</td>
+                    <td class="p-4 text-xs text-slate-400 uppercase font-bold">${w.field_name}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="delWinner('${w.id}', '${regId}')" class="text-red-400 font-bold hover:scale-110 transition-transform">ลบ</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function delWinner(id, regId) {
+            if(confirm('ลบรายชื่อผู้ชนะนี้?')) { await _supabase.from('lucky_winners').delete().eq('id', id); loadWinnerHistory(regId); }
+        }
+
+        async function resetAllWinnersAdmin() {
+            const regId = document.getElementById('draw-project-select').value;
+            if(regId && confirm('ล้างประวัติทั้งหมดของงานนี้?')) { await _supabase.from('lucky_winners').delete().eq('registration_id', regId); loadWinnerHistory(regId); }
+        }
+
+        function openLuckyDrawWindow() {
+            const id = document.getElementById('draw-project-select').value;
+            const field = document.querySelector('input[name="draw-field"]:checked')?.value;
+            if(id && field) window.open(`luckydraw.html?id=${id}&field=${encodeURIComponent(field)}`, '_blank');
+        }
+
+        // --- Projects Page ---
+        async function loadProjects() {
+            const { data } = await _supabase.from('registrations').select('*').order('created_at', {ascending: false});
+            document.getElementById('project-list').innerHTML = (data || []).map(p => `
+                <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-200 hover:shadow-xl transition-all group">
+                    <h3 class="text-xl font-black mb-6 text-slate-800">${p.title}</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <a href="register.html?id=${p.id}" target="_blank" class="bg-indigo-50 text-indigo-600 p-4 rounded-2xl text-xs font-black text-center hover:bg-indigo-600 hover:text-white transition-all">🔗 REGISTER</a>
+                        <a href="dashboard.html?id=${p.id}" target="_blank" class="bg-emerald-50 text-emerald-600 p-4 rounded-2xl text-xs font-black text-center hover:bg-emerald-600 hover:text-white transition-all">📊 DATA</a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Helpers
+        function openFieldModal() { document.getElementById('modal').classList.remove('hidden'); document.getElementById('field-id').value = ""; }
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        function toggleOpt() { document.getElementById('opt-wrap').classList.toggle('hidden', !['radio', 'select'].includes(document.getElementById('field-type').value)); }
+        function editField(f) { openFieldModal(); document.getElementById('field-id').value = f.id; document.getElementById('field-label').value = f.label; document.getElementById('field-type').value = f.field_type; document.getElementById('field-opts').value = f.options.join(','); toggleOpt(); }
+        async function delField(id) { if(confirm('Del?')) { await _supabase.from('form_fields').delete().eq('id', id); loadMaster(); } }
+
+        // Initial Load
+        switchTab('master');
+    </script>
+</body>
+</html>
