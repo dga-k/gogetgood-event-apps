@@ -41,7 +41,8 @@
 
     <script>
        
-
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoEventId = urlParams.get('eventId');
         const eventDropdown = document.getElementById('event-dropdown');
         const teamDropdown = document.getElementById('team-dropdown');
         const voteBtn = document.getElementById('vote-btn');
@@ -51,64 +52,78 @@
 
         // 1. ดึงรายชื่อ Event ทั้งหมดที่มีในระบบ
         async function initEvents() {
-            try {
-                const { data: events, error } = await _supabase.from('events_festival').select('*').order('created_at', { ascending: false });
+            const evDrop = document.getElementById('event-dropdown');
+            const teamDrop = document.getElementById('team-dropdown');
+            const voteBtn = document.getElementById('vote-btn');
 
-                if (error) throw error;
+            // 1. ดึงข้อมูล Event ทั้งหมดมาเตรียมไว้ก่อน
+            const { data: events, error } = await _supabase
+                .from('events_festival')
+                .select('*')
+                .order('created_at', {ascending: false});
 
-                if (!events || events.length === 0) {
-                    eventDropdown.innerHTML = '<option value="">❌ ไม่มีงานในระบบ</option>';
-                    return;
+            if (error || !events || events.length === 0) {
+                evDrop.innerHTML = '<option value="">❌ ไม่พบงานในระบบ</option>';
+                return;
+            }
+
+            // 2. เติมข้อมูลลง Dropdown
+            evDrop.innerHTML = '<option value="" disabled selected>-- เลือกงานที่ต้องการโหวต --</option>' + 
+                events.map(ev => `<option value="${ev.id}">${ev.event_name}</option>`).join('');
+            
+            // 3. ตั้งค่า Event Listener เมื่อมีการเปลี่ยนงาน (กรณีเลือกเอง)
+            evDrop.onchange = (e) => {
+                loadTeams(e.target.value);
+                // รีเซ็ตปุ่มโหวตและข้อความเมื่อเปลี่ยนงาน
+                voteBtn.disabled = true;
+                document.getElementById('msg').textContent = "";
+            };
+
+            // 4. ❗️ หัวใจสำคัญ: ตรวจสอบว่ามีการส่ง ID มาจาก URL หรือไม่
+            if (autoEventId) {
+                // ตรวจสอบว่า ID ที่ส่งมา มีอยู่ในรายการที่โหลดมาหรือไม่
+                const exists = events.find(ev => ev.id === autoEventId);
+                if (exists) {
+                    evDrop.value = autoEventId; // ล็อกงานให้ใน Dropdown
+                    // evDrop.disabled = true; // (ทางเลือก) ถ้าอยากล็อกไม่ให้เขาเปลี่ยนงานเลยให้เปิดบรรทัดนี้
+                    loadTeams(autoEventId);
+                } else {
+                    console.error("Event ID จาก Link ไม่ถูกต้อง");
                 }
-
-                eventDropdown.innerHTML = events.map(ev => `<option value="${ev.id}">${ev.event_name}</option>`).join('');
-
-                eventDropdown.addEventListener('change', (e) => loadTeams(e.target.value));
-            } catch (err) {
-                console.error(err);
-                msg.textContent = "เกิดข้อผิดพลาดในการโหลดงาน";
-                msg.className = "error";
             }
         }
 
-        // 2. ดึงรายชื่อทีมเฉพาะของ Event ที่เลือก
+        // ฟังก์ชันโหลดทีม (ปรับปรุงเพื่อล้างข้อมูลเก่า)
         async function loadTeams(eventId) {
-            teamDropdown.disabled = true;
-            teamDropdown.innerHTML = '<option>กำลังโหลดรายชื่อทีม...</option>';
+            const tDrop = document.getElementById('team-dropdown');
+            const voteBtn = document.getElementById('vote-btn');
+            
+            tDrop.innerHTML = '<option value="">กำลังโหลดรายชื่อทีม...</option>';
+            tDrop.disabled = true;
             voteBtn.disabled = true;
-            msg.textContent = "";
 
-            try {
-                const { data: teams, error } = await _supabase
-                    .from('teams')
-                    .select('*')
-                    .eq('event_id', eventId)
-                    .order('team_name', { ascending: true });
+            const { data: teams, error } = await _supabase
+                .from('teams')
+                .select('*')
+                .eq('event_id', eventId)
+                .order('team_name');
 
-                if (error) throw error;
-
-                if (!teams || teams.length === 0) {
-                    teamDropdown.innerHTML = '<option value="">❌ งานนี้ยังไม่มีรายชื่อทีม</option>';
-                    return;
-                }
-
-                teamDropdown.innerHTML = '<option value="" disabled selected>-- เลือกทีม --</option>' + 
-                    teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
-                
-                teamDropdown.disabled = false;
-                
-                teamDropdown.onchange = () => {
-                    voteBtn.disabled = !teamDropdown.value;
-                };
-
-                voteBtn.onclick = () => handleVote(teamDropdown.value);
-
-            } catch (err) {
-                console.error(err);
-                teamDropdown.innerHTML = '<option>เกิดข้อผิดพลาด</option>';
+            if (error || !teams || teams.length === 0) {
+                tDrop.innerHTML = '<option value="">❌ งานนี้ยังไม่มีรายชื่อทีม</option>';
+                return;
             }
-        }
 
+            tDrop.innerHTML = '<option value="" disabled selected>-- เลือกทีมของคุณ --</option>' + 
+                teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+            
+            tDrop.disabled = false;
+            
+            tDrop.onchange = () => {
+                voteBtn.disabled = !tDrop.value;
+            };
+            voteBtn.onclick = () => handleVote(tDrop.value);
+                //dropdown.onchange = () => document.getElementById('vote-btn').disabled = false;
+        }
         // 3. ฟังก์ชันส่งโหวต
         async function handleVote(teamId) {
             if (!teamId) return;
@@ -142,6 +157,7 @@
                 setTimeout(() => {
                     voteBtn.textContent = 'ยืนยันการโหวต';
                     voteBtn.disabled = false;
+                    location.reload()
                 }, 2000);
 
             } catch (err) {

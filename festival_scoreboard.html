@@ -153,7 +153,8 @@
 
     <script>
         // --- ❗️ ตั้งค่า SUPABASE ❗️ ---
-
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentEventId = urlParams.get('eventId');
         const BEER_ICON_URL = 'https://gogetgood.com/changefestival/Obj-02-2.png';
         const MAX_BAR_HEIGHT_PIXELS = 400;
         let timerInterval = null;
@@ -184,16 +185,22 @@
         // --- 📊 ดึงข้อมูลจาก SUPABASE ---
         async function fetchScores() {
             try {
-                // ดึงงานล่าสุดก่อน (Event ล่าสุด)
-                const { data: events } = await _supabase.from('events_festival').select('id').order('created_at', { ascending: false }).limit(1);
+                // ดึงงานล่าสุด
+                // ก่อน (Event ล่าสุด)
+                if(!currentEventId) {
+                const { data } = await _supabase.from('events_festival').select('id, event_name').order('created_at', {ascending: false}).limit(1);
+                if(data.length > 0) currentEventId = data[0].id;
+                }
+                if(!currentEventId) return;
+                //const { data: events } = await _supabase.from('events_festival').select('id').order('created_at', { ascending: false }).limit(1);
                 
-                if (!events || events.length === 0) return;
+               // if (!events || events.length === 0) return;
 
                 // ดึงทีมที่อยู่ใน Event นั้น
                 const { data: teams, error } = await _supabase
                     .from('teams')
                     .select('*')
-                    .eq('event_id', events[0].id)
+                    .eq('event_id', currentEventId)
                     .order('score', { ascending: false });
 
                 if (error) throw error;
@@ -269,6 +276,8 @@
             const s = seconds % 60;
             displayElement.textContent = `${String(m + (h*60)).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
+        _supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchScores).subscribe();
+        fetchScores();
     </script>
 </body>
 </html>
