@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <title>RegisPro Admin</title>
+</head>
+<body class="bg-slate-50 flex min-h-screen font-sans">
+
+    <aside class="w-72 bg-slate-900 text-slate-300 flex flex-col p-6 fixed h-full shadow-2xl z-50">
+        <div class="mb-10 px-2 text-white text-2xl font-black italic tracking-tighter">REGIS<span class="text-indigo-500">PRO</span></div>
+        <nav class="space-y-1 flex-1">
+            <button onclick="switchTab('master')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>📁</span> Master Data</button>
+            <button onclick="switchTab('config')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>🛠</span> Form Builder</button>
+            <button onclick="switchTab('links')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>🔗</span> My Projects</button>
+            <button onclick="switchTab('luckydraw')" class="nav-btn w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-slate-800 transition-all text-sm font-bold"><span>🎁</span> Lucky Draw</button>
+        </nav>
+    </aside>
+
+    <main class="ml-72 flex-1 p-10">
+        <section id="tab-master" class="tab-content hidden animate-in fade-in duration-500">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-black text-slate-800">จัดการ Master Data</h2>
+                <button onclick="openFieldModal()" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100">+ เพิ่มฟิลด์ใหม่</button>
+            </div>
+            <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-400 text-xs font-black uppercase">
+                        <tr><th class="p-5">Label</th><th class="p-5">Type</th><th class="p-5">Options</th><th class="p-5 text-center">Action</th></tr>
+                    </thead>
+                    <tbody id="master-table-body" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="tab-config" class="tab-content hidden">
+            <h2 class="text-3xl font-black text-slate-800 mb-8">สร้างฟอร์มใหม่</h2>
+            <div class="flex flex-col lg:flex-row gap-10">
+                <div class="flex-1 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
+                    <input type="text" id="reg-title" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="ชื่อโครงการ...">
+                    <div id="field-selector" class="grid grid-cols-2 gap-3"></div>
+                    <button onclick="saveRegistration()" class="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100">บันทึกโครงการ</button>
+                </div>
+                <div class="w-80 bg-slate-900 rounded-[3.5rem] p-3 shadow-2xl h-[600px] relative overflow-hidden hidden lg:block">
+                    <div class="bg-white h-full rounded-[2.8rem] p-6 overflow-y-auto">
+                        <p class="text-[10px] text-center font-bold text-slate-400 uppercase mb-4">Live Preview</p>
+                        <h4 id="pre-title" class="font-bold text-center mb-6">ตัวอย่าง</h4>
+                        <div id="pre-fields" class="space-y-3"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="tab-luckydraw" class="tab-content hidden animate-in fade-in duration-500">
+            <div class="mb-8">
+                <h2 class="text-3xl font-black text-slate-800">จัดการระบบสุ่มรางวัล</h2>
+                <p class="text-slate-500">เลือกโครงการเพื่อเริ่มสุ่ม หรือจัดการรายชื่อผู้โชคดี</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 h-fit">
+                    <label class="block text-sm font-bold text-slate-400 mb-2 uppercase">1. เลือกโปรเจกต์</label>
+                    <select id="draw-project-select" onchange="loadDrawFields()" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none mb-6"></select>
+                    
+                    <label class="block text-sm font-bold text-slate-400 mb-2 uppercase">2. ฟิลด์ที่จะแสดงผล</label>
+                    <div id="draw-field-options" class="space-y-2 mb-8 p-4 bg-slate-50 rounded-2xl"></div>
+
+                    <button onclick="openLuckyDrawWindow()" class="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                        🚀 เปิดหน้าจอสุ่ม (Live)
+                    </button>
+                </div>
+
+                <div class="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-black text-slate-800">ประวัติผู้โชคดีในระบบ</h3>
+                        <button onclick="resetAllWinnersAdmin()" class="text-xs font-bold text-red-500 hover:underline uppercase">
+                            🗑️ ล้างประวัติทั้งหมด
+                        </button>
+                    </div>
+
+                    <div class="overflow-hidden rounded-2xl border border-slate-100">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black">
+                                <tr>
+                                    <th class="p-4">ผู้โชคดี</th>
+                                    <th class="p-4">ฟิลด์ที่สุ่ม</th>
+                                    <th class="p-4">วันที่/เวลา</th>
+                                    <th class="p-4 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-winner-history" class="divide-y divide-slate-100 text-sm">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section id="tab-links" class="tab-content hidden">
+            <h2 class="text-3xl font-black text-slate-800 mb-8">ลิ้งก์และรายงาน</h2>
+            <div id="project-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+        </section>
+    </main>
+
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <h3 class="text-xl font-black mb-6">ฟิลด์ข้อมูล</h3>
+            <div class="space-y-4">
+                <input type="hidden" id="field-id">
+                <input type="text" id="field-label" placeholder="ชื่อหัวข้อ (เช่น ไซส์เสื้อ)" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+               <select id="field-type" onchange="toggleOpt()" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+                    <option value="text">ข้อความ</option>
+                    <option value="number">ตัวเลข</option>
+                    <option value="radio">ตัวเลือกเดียว (Radio)</option>
+                    <option value="select">ตัวเลือกแบบ Dropdown</option> <option value="address_th">ที่อยู่ไทย</option>
+                </select>
+                <div id="opt-wrap" class="hidden">
+                    <input type="text" id="field-opts" placeholder="ตัวเลือก (แยกด้วย , )" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200">
+                </div>
+                <label class="flex items-center gap-2 p-2 cursor-pointer">
+                <input type="checkbox" id="field-required" class="w-5 h-5 accent-indigo-600">
+                <span class="text-sm font-bold text-slate-700">จำเป็นต้องกรอก (Required)</span>
+            </label>
+            </div>
+            <div class="flex gap-4 mt-8">
+                <button onclick="closeModal()" class="flex-1 font-bold text-slate-400">ยกเลิก</button>
+                <button onclick="submitField()" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       
+        let masterFields = [];
+
+        async function switchTab(name) {
+            document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
+            document.getElementById('tab-' + name).classList.remove('hidden');
+            if(name === 'master') loadMaster();
+            if(name === 'config') loadBuilder();
+            if(name === 'links') loadProjects();
+            if(name === 'luckydraw') prepareLuckyDrawUI();
+        }
+
+        // --- Master Data Logic ---
+        async function loadMaster() {
+            const { data } = await _supabase.from('form_fields').select('*').order('created_at', {ascending: true});
+            masterFields = data || [];
+            document.getElementById('master-table-body').innerHTML = masterFields.map(f => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-5 font-bold text-slate-700">${f.label}</td>
+                    <td class="p-5 text-indigo-500 font-bold text-xs">${f.field_type}</td>
+                    <td class="p-5 text-slate-400 text-xs">${f.options.length ? f.options.join(',') : '-'}</td>
+                    <td class="p-5 text-center space-x-3">
+                        <button onclick='editField(${JSON.stringify(f)})' class="text-amber-500 font-bold">Edit</button>
+                        <button onclick="delField('${f.id}')" class="text-red-400 font-bold">Del</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function submitField() {
+            const id = document.getElementById('field-id').value;
+            const payload = { 
+                label: document.getElementById('field-label').value, 
+                field_type: document.getElementById('field-type').value,
+                options: document.getElementById('field-opts').value.split(',').map(s => s.trim()).filter(s => s),
+                is_required: document.getElementById('field-required').checked // เพิ่มอันนี้
+            };
+            if(id) await _supabase.from('form_fields').update(payload).eq('id', id);
+            else await _supabase.from('form_fields').insert([payload]);
+            closeModal(); loadMaster();
+        }
+
+        // --- Builder Logic ---
+        async function loadBuilder() {
+            if(!masterFields.length) await loadMaster();
+            document.getElementById('field-selector').innerHTML = masterFields.map(f => `
+                <label class="flex items-center p-4 bg-slate-50 rounded-2xl cursor-pointer border-2 border-transparent has-[:checked]:border-indigo-500">
+                    <input type="checkbox" name="f-check" value="${f.id}" onchange="updatePre()" class="w-5 h-5 accent-indigo-600">
+                    <span class="ml-3 font-bold text-slate-600 text-sm">${f.label}</span>
+                </label>
+            `).join('');
+        }
+        // โหลดรายการโปรเจกต์ลงใน Select ของ Lucky Draw
+        // ดึงฟิลด์ของโปรเจกต์ที่เลือก
+        async function loadDrawFields() {
+            const select = document.getElementById('draw-project-select');
+            const option = select.selectedOptions[0];
+            if(!option.value) return;
+
+            const config = JSON.parse(option.getAttribute('data-config'));
+            document.getElementById('draw-field-options').innerHTML = config.map(f => `
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="radio" name="draw-field" value="${f.label}" class="w-4 h-4 accent-indigo-600" checked>
+                    <span class="font-bold text-slate-700">${f.label}</span>
+                </label>
+            `).join('');
+
+            loadWinnerHistory(option.value); // โหลดประวัติของผู้ชนะในโปรเจกต์นี้
+        }
+
+        // โหลดประวัติผู้ชนะมาแสดงในหน้าจัดการ
+        async function loadWinnerHistory(regId) {
+            const { data } = await _supabase.from('lucky_winners').select('*').eq('registration_id', regId).order('created_at', {ascending: false});
+            const tbody = document.getElementById('admin-winner-history');
+            console.log(data.length)
+            if(!data.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-10 text-center text-slate-400">ยังไม่มีประวัติผู้โชคดี</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(w => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-4 font-bold text-slate-800">${w.winner_name}</td>
+                    <td class="p-4 text-slate-500 text-xs">${w.field_name}</td>
+                    <td class="p-4 text-slate-400 text-[10px]">${new Date(w.created_at).toLocaleString('th-TH')}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="deleteSingleWinner('${w.id}', '${regId}')" class="text-red-400 hover:text-red-600 font-bold">ลบ</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // ลบรายชื่อเดียว (กรณีไม่อยู่ในงาน)
+        async function deleteSingleWinner(id, regId) {
+            if(!confirm('ยืนยันลบชื่อนี้เพื่อให้สามารถสุ่มใหม่ได้?')) return;
+            await _supabase.from('lucky_winners').delete().eq('id', id);
+            loadWinnerHistory(regId);
+        }
+
+        // Reset ทั้งโปรเจกต์
+        async function resetAllWinnersAdmin() {
+            const regId = document.getElementById('draw-project-select').value;
+            if(!regId) return alert("กรุณาเลือกโปรเจกต์ก่อน");
+            if(!confirm('⚠️ ยืนยันการล้างประวัติผู้ชนะทั้งหมดในโปรเจกต์นี้?')) return;
+            
+            await _supabase.from('lucky_winners').delete().eq('registration_id', regId);
+            loadWinnerHistory(regId);
+        }
+
+        // เปิดหน้าจอสุ่ม
+        function openLuckyDrawWindow() {
+            const regId = document.getElementById('draw-project-select').value;
+            const fieldName = document.querySelector('input[name="draw-field"]:checked')?.value;
+            if(!regId || !fieldName) return alert("กรุณาเลือกข้อมูลให้ครบ");
+            
+            window.open(`luckydraw.html?id=${regId}&field=${encodeURIComponent(fieldName)}`, '_blank');
+        }
+        async function prepareLuckyDrawUI() {
+            const { data } = await _supabase.from('registrations').select('*').order('created_at', {ascending: false});
+            const select = document.getElementById('draw-project-select');
+            select.innerHTML = '<option value="">-- เลือกโปรเจกต์ --</option>' + 
+                data.map(p => `<option value="${p.id}" data-config='${JSON.stringify(p.form_config)}'>${p.title}</option>`).join('');
+            
+            select.onchange = function() {
+                const option = select.selectedOptions[0];
+                if(!option.value) return;
+                const config = JSON.parse(option.getAttribute('data-config'));
+                const fieldBox = document.getElementById('draw-field-options');
+                fieldBox.innerHTML = config.map(f => `
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-600">
+                        <input type="radio" name="draw-field" value="${f.id}" class="w-4 h-4" checked> ${f.label}
+                    </label>
+                `).join('');
+                loadWinnerHistory(option.value); 
+            };
+        }
+        function prepareDraw() {
+            const regId = document.getElementById('draw-project-select').value;
+            const fieldName = document.querySelector('input[name="draw-field"]:checked')?.value;
+            
+            if(!regId || !fieldName) return alert("กรุณาเลือกโปรเจกต์และฟิลด์");
+
+            // สร้าง URL และเปิดหน้าสุ่มใน Tab ใหม่
+            const luckydrawUrl = `luckydraw.html?id=${regId}&field=${encodeURIComponent(fieldName)}`;
+            window.open(luckydrawUrl, '_blank');
+        }
+        function updatePre() {
+            document.getElementById('pre-title').innerText = document.getElementById('reg-title').value || 'ตัวอย่าง';
+            const selected = Array.from(document.querySelectorAll('input[name="f-check"]:checked'));
+            document.getElementById('pre-fields').innerHTML = selected.map(() => `<div class="h-8 bg-slate-100 rounded-xl border border-dashed border-slate-300"></div>`).join('');
+        }
+
+        async function saveRegistration() {
+            const selectedIds = Array.from(document.querySelectorAll('input[name="f-check"]:checked')).map(el => el.value);
+            const config = masterFields.filter(f => selectedIds.includes(f.id));
+            const { data } = await _supabase.from('registrations').insert([{ title: document.getElementById('reg-title').value, form_config: config }]).select();
+            if(data) alert("สร้างโครงการสำเร็จ!");
+        }
+
+        // --- Projects Logic ---
+        async function loadProjects() {
+            const { data } = await _supabase.from('registrations').select('*').order('created_at', {ascending: false});
+            document.getElementById('project-list').innerHTML = data.map(p => `
+                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
+                    <h3 class="text-lg font-black mb-4">${p.title}</h3>
+                    <div class="grid grid-cols-2 gap-2 text-center text-xs font-bold">
+                        <a href="register.html?id=${p.id}" target="_blank" class="bg-indigo-50 text-indigo-600 p-3 rounded-xl hover:bg-indigo-100">🔗 Register Page</a>
+                        <a href="dashboard.html?id=${p.id}" target="_blank" class="bg-emerald-50 text-emerald-600 p-3 rounded-xl hover:bg-emerald-100">📊 View Data</a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Helpers
+        function openFieldModal() { document.getElementById('modal').classList.remove('hidden'); document.getElementById('field-id').value = ""; }
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        function toggleOpt() { document.getElementById('opt-wrap').classList.toggle('hidden', document.getElementById('field-type').value !== 'radio'); }
+        function editField(f) { openFieldModal(); document.getElementById('field-id').value = f.id; document.getElementById('field-label').value = f.label; document.getElementById('field-type').value = f.field_type; document.getElementById('field-opts').value = f.options.join(','); document.getElementById('field-required').checked = f.is_required || false;toggleOpt(); }
+        async function delField(id) { if(confirm('Del?')) { await _supabase.from('form_fields').delete().eq('id', id); loadMaster(); } }
+
+        switchTab('master');
+    </script>
+</body>
+</html>

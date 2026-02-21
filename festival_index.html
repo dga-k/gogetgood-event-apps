@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vote - เลือกงานและทีม</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-image: url('Challenge-02.png');  color: white; font-family: 'Kanit', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 2px solid #00ffcc; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 0 20px rgba(0,255,204,0.2); }
+        h2 { color: #ffd700; margin-bottom: 25px; }
+        label { display: block; text-align: left; margin-bottom: 5px; color: #ccc; font-size: 0.9rem; }
+        select { width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; background: #222; color: white; border: 1px solid #444; font-size: 1rem; }
+        select:focus { border-color: #00ffcc; outline: none; }
+        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: #00ffcc; color: black; font-weight: bold; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        #msg { margin-top: 15px; font-weight: bold; }
+        .success { color: #00ffcc; }
+        .error { color: #ff4d4d; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>โหวตทีมของคุณ</h2>
+        
+        <label>1. เลือกงานที่ต้องการโหวต:</label>
+        <select id="event-dropdown">
+            <option value="" disabled selected>กำลังโหลดรายชื่อโครงการ...</option>
+        </select>
+
+        <label>2. เลือกทีม:</label>
+        <select id="team-dropdown" disabled>
+            <option value="" disabled selected>-- กรุณาเลือกงานก่อน --</option>
+        </select>
+
+        <button id="vote-btn" disabled>ยืนยันการโหวต</button>
+        <p id="msg"></p>
+    </div>
+
+    <script>
+       
+
+        const eventDropdown = document.getElementById('event-dropdown');
+        const teamDropdown = document.getElementById('team-dropdown');
+        const voteBtn = document.getElementById('vote-btn');
+        const msg = document.getElementById('msg');
+
+        document.addEventListener('DOMContentLoaded', initEvents);
+
+        // 1. ดึงรายชื่อ Event ทั้งหมดที่มีในระบบ
+        async function initEvents() {
+            try {
+                const { data: events, error } = await _supabase.from('events_festival').select('*').order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                if (!events || events.length === 0) {
+                    eventDropdown.innerHTML = '<option value="">❌ ไม่มีงานในระบบ</option>';
+                    return;
+                }
+
+                eventDropdown.innerHTML = events.map(ev => `<option value="${ev.id}">${ev.event_name}</option>`).join('');
+
+                eventDropdown.addEventListener('change', (e) => loadTeams(e.target.value));
+            } catch (err) {
+                console.error(err);
+                msg.textContent = "เกิดข้อผิดพลาดในการโหลดงาน";
+                msg.className = "error";
+            }
+        }
+
+        // 2. ดึงรายชื่อทีมเฉพาะของ Event ที่เลือก
+        async function loadTeams(eventId) {
+            teamDropdown.disabled = true;
+            teamDropdown.innerHTML = '<option>กำลังโหลดรายชื่อทีม...</option>';
+            voteBtn.disabled = true;
+            msg.textContent = "";
+
+            try {
+                const { data: teams, error } = await _supabase
+                    .from('teams')
+                    .select('*')
+                    .eq('event_id', eventId)
+                    .order('team_name', { ascending: true });
+
+                if (error) throw error;
+
+                if (!teams || teams.length === 0) {
+                    teamDropdown.innerHTML = '<option value="">❌ งานนี้ยังไม่มีรายชื่อทีม</option>';
+                    return;
+                }
+
+                teamDropdown.innerHTML = '<option value="" disabled selected>-- เลือกทีม --</option>' + 
+                    teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+                
+                teamDropdown.disabled = false;
+                
+                teamDropdown.onchange = () => {
+                    voteBtn.disabled = !teamDropdown.value;
+                };
+
+                voteBtn.onclick = () => handleVote(teamDropdown.value);
+
+            } catch (err) {
+                console.error(err);
+                teamDropdown.innerHTML = '<option>เกิดข้อผิดพลาด</option>';
+            }
+        }
+
+        // 3. ฟังก์ชันส่งโหวต
+        async function handleVote(teamId) {
+            if (!teamId) return;
+
+            voteBtn.disabled = true;
+            voteBtn.textContent = 'กำลังบันทึกคะแนน...';
+
+            try {
+                // ดึงคะแนนปัจจุบัน
+                const { data, error } = await _supabase
+                    .from('teams')
+                    .select('score, team_name')
+                    .eq('id', teamId)
+                    .single();
+
+                if (error) throw error;
+
+                // อัปเดตคะแนน +1
+                const { error: upError } = await _supabase
+                    .from('teams')
+                    .update({ score: data.score + 1 })
+                    .eq('id', teamId);
+
+                if (upError) throw upError;
+
+                msg.textContent = `✅ โหวตให้ทีม ${data.team_name} สำเร็จ!`;
+                msg.className = "success";
+                voteBtn.textContent = 'ส่งคะแนนเรียบร้อย';
+
+                // คูลดาวน์ 2 วินาทีก่อนให้กดใหม่ได้
+                setTimeout(() => {
+                    voteBtn.textContent = 'ยืนยันการโหวต';
+                    voteBtn.disabled = false;
+                }, 2000);
+
+            } catch (err) {
+                console.error(err);
+                msg.textContent = "❌ โหวตไม่สำเร็จ กรุณาลองใหม่";
+                msg.className = "error";
+                voteBtn.disabled = false;
+                voteBtn.textContent = 'ยืนยันการโหวต';
+            }
+        }
+    </script>
+</body>
+</html>

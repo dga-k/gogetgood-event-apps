@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <title>Submission Dashboard</title>
+</head>
+<body class="bg-slate-50 min-h-screen p-4 md:p-10">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div>
+                <h1 id="event-title" class="text-2xl font-black text-slate-800">รายชื่อผู้ลงทะเบียน</h1>
+                <p id="event-stats" class="text-slate-400 text-sm">กำลังโหลดข้อมูล...</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportToCSV()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-emerald-100">
+                    📥 Export CSV
+                </button>
+                <button onclick="fetchSubmissions()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-bold transition-all">
+                    🔄 รีเฟรช
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 border-b border-slate-100">
+                        <tr id="table-head" class="text-slate-500 text-xs uppercase tracking-widest">
+                            </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-100 text-sm text-slate-600">
+                        </tbody>
+                </table>
+            </div>
+            <div id="empty-state" class="hidden p-20 text-center text-slate-400">
+                ยังไม่มีผู้ลงทะเบียนในขณะนี้
+            </div>
+        </div>
+    </div>
+
+    <script>
+       
+        const regId = new URLSearchParams(window.location.search).get('id');
+        let allSubmissions = [];
+
+        async function init() {
+            if(!regId) return alert("ไม่พบรหัสกิจกรรม");
+            
+            // 1. ดึงข้อมูลหัวข้องาน
+            const { data: reg } = await _supabase.from('registrations').select('title').eq('id', regId).single();
+            if(reg) document.getElementById('event-title').innerText = `รายชื่อ: ${reg.title}`;
+
+            await fetchSubmissions();
+        }
+
+        async function fetchSubmissions() {
+            const { data, error } = await _supabase
+                .from('registration_submissions')
+                .select('*')
+                .eq('registration_id', regId)
+                .order('created_at', { ascending: false });
+
+            if(error) return console.error(error);
+            allSubmissions = data;
+
+            renderTable();
+        }
+
+        function renderTable() {
+            const head = document.getElementById('table-head');
+            const body = document.getElementById('table-body');
+            const empty = document.getElementById('empty-state');
+
+            if(allSubmissions.length === 0) {
+                empty.classList.remove('hidden');
+                head.innerHTML = "";
+                body.innerHTML = "";
+                return;
+            }
+            empty.classList.add('hidden');
+
+            // 1. สร้างหัวตารางจาก Key ทั้งหมดที่อยู่ใน submitted_data
+            const keys = Object.keys(allSubmissions[0].submitted_data);
+            head.innerHTML = `
+                <th class="p-5 font-bold">วันที่ลงทะเบียน</th>
+                ${keys.map(k => `<th class="p-5 font-bold">${k}</th>`).join('')}
+                <th class="p-5 font-bold text-center">จัดการ</th>
+            `;
+
+            // 2. แสดงข้อมูล
+            body.innerHTML = allSubmissions.map(row => `
+                <tr class="hover:bg-slate-50 transition-all">
+                    <td class="p-5 text-xs text-slate-400">
+                        ${new Date(row.created_at).toLocaleString('th-TH')}
+                    </td>
+                    ${keys.map(k => `<td class="p-5 font-medium text-slate-700">${row.submitted_data[k] || '-'}</td>`).join('')}
+                    <td class="p-5 text-center">
+                        <button onclick="deleteSubmission('${row.id}')" class="text-red-400 hover:text-red-600 font-bold">ลบ</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('event-stats').innerText = `พบทั้งหมด ${allSubmissions.length} รายชื่อ`;
+        }
+
+        async function deleteSubmission(id) {
+            if(!confirm("คุณแน่ใจหรือไม่ที่จะลบรายชื่อนี้?")) return;
+            const { error } = await _supabase.from('registration_submissions').delete().eq('id', id);
+            if(!error) fetchSubmissions();
+        }
+
+        function exportToCSV() {
+            if(allSubmissions.length === 0) return;
+            
+            const keys = Object.keys(allSubmissions[0].submitted_data);
+            const header = ["Timestamp", ...keys].join(",");
+            const rows = allSubmissions.map(row => {
+                const values = keys.map(k => `"${row.submitted_data[k] || ''}"`);
+                return [`"${row.created_at}"`, ...values].join(",");
+            });
+
+            const csvContent = "\uFEFF" + [header, ...rows].join("\n"); // เพิ่ม BOM สำหรับภาษาไทย
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `submissions_${regId}.csv`);
+            link.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>

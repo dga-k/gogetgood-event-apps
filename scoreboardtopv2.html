@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoreboard - ดื่มลืมโลก FESTIVAL</title>
+    <style>
+        body {
+            background-image: url('Challenge-02.png'); /* พื้นหลังคล้ายๆ ในรูป */
+            font-family: 'Play', sans-serif;
+            
+        
+            height: 100%; 
+        }
+
+        h1 {
+            color: #FFD700;
+            font-size: 3rem;
+            text-shadow: 2px 2px 4px #000;
+        }
+ #timer-controls {
+            margin: 20px 0;
+            padding: 50px 15px 100px;
+            border-radius: 10px;
+            text-align: left;
+            height: 100px;
+        }
+
+        #timer-display {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #FFC107;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px #000;
+            
+        }
+
+        #start-button {
+            background-color: #4CAF50; /* สีเขียว */
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #start-button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        #start-button:not(:disabled):hover {
+            background-color: #45a049;
+        }
+
+        /* Container หลักของกราฟ */
+        #chart-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end; /* ให้แท่งกราฟเริ่มจากด้านล่าง */
+            max-width: 90%;
+            height: 600px; /* ความสูงของพื้นที่กราฟ */
+            margin: 10px auto 0 auto;
+            padding: 0px 10px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3); /* เส้นพื้น */
+        }
+
+        /* 1 ชุด (แท่ง + ชื่อ) */
+        .bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 15%; /* ความกว้างของแต่ละทีม */
+            animation: fadeIn 0.5s ease;
+        }
+
+        /* แท่งกราฟสีขาว */
+        .bar {
+            width: 80px;
+            background-color:#FFC107;
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 0 10px rgba(255, 255, 100, 0.5);
+            position: relative; /* สำหรับวางไอคอนและตัวเลข */
+            height: 0; /* เริ่มต้นที่ 0 */
+            /* ❗️❗️ แก้ไขตรงนี้ ❗️❗️ */
+            /* เพิ่ม !important เพื่อให้แน่ใจว่าการเปลี่ยนแปลงความสูงจะถูก Transition */
+            transition: height 0.8s ease-out !important;
+        }
+
+        /* ไอคอนเบียร์ (ใช้รูปจากเว็บ) */
+        .bar-icon {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            position: absolute;
+            top: -50px; /* วางไว้เหนือแท่ง */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ตัวเลขคะแนน */
+        .bar-score {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #FF8C00; /* สีส้ม */
+            text-shadow: 1px 1px 2px #000;
+            margin-top: 15px; /* ระยะห่างจากด้านบนของแท่ง (ถ้าไอคอนเล็ก) */
+            /* ถ้าไอคอนใหญ่ ให้ปรับตำแหน่งเทียบกับ .bar */
+            position: absolute;
+            width: 100%;
+            top: 40px; /* ปรับตำแหน่งตัวเลขให้อยู่บนแท่ง */
+        }
+
+        /* ป้ายชื่อทีมสีเหลือง */
+        .team-label {
+            background-color:  rgba(3, 73, 36, 0.9);
+            color: #f4f1f1;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            width: 70%;
+            max-width: 130px;
+            min-height: 45px; /* ล็อกความสูงไว้เพื่อให้กล่องเท่ากัน */
+        display: -webkit-box;
+        -webkit-line-clamp: 4; /* แสดงชื่อสูงสุด 2 บรรทัด */
+        -webkit-box-orient: vertical;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            /*white-space: nowrap; /* ไม่ให้ตัดบรรทัด */
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+        /* สำหรับมือถือ */
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            #chart-container {
+                height: 60vh;
+                justify-content: space-between;
+            }
+            .bar { width: 40px; } /* ลดขนาดแท่ง */
+            .bar-icon { width: 40px; height: 40px; top: -25px; }
+            .bar-score { font-size: 1.5rem; top: 20px; }
+            .team-label { font-size: 0.8rem; padding: 8px 5px; margin-top: 10px; }
+        }
+
+    </style>
+</head>
+<body>
+<div id="timer-controls">
+        <div id="timer-display">180:00</div>
+        <button id="start-button">เริ่มนับถอยหลัง (180 นาที)</button>
+    </div>
+ 
+
+    <div id="chart-container">
+        </div>
+
+    <script>
+        // ❗️❗️❗️ สำคัญมาก ❗️❗️❗️
+        // วาง URL ของ WEB APP ตัวเดิม ที่คุณใช้ในไฟล์ index.html
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx2JVE4FZzWpCr7RQcuaelSoUgSkD5ktNehAFOyLVuT84w7VFSBnT256hJvUOX6pp-aiw/exec';
+
+        // URL ของไอคอนเบียร์ (หาจากเว็บ)
+        const BEER_ICON_URL = 'https:///gogetgood.com/changefestival/Obj-02-2.png';
+        let gameActive = false;
+        // ความสูงสูงสุดของแท่งกราฟ (คิดเป็น % ของ container)
+        const MAX_BAR_HEIGHT_PERCENT = 90; // กันไม่ให้ชนขอบบนสุด
+        const MAX_BAR_HEIGHT_PIXELS = 400; // 550px จาก 600px ที่ตั้งไว้ใน CSS
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. ดึงคะแนนครั้งแรกเมื่อโหลดหน้า
+            fetchScores();
+        // 2. ตั้งเวลาดึงคะแนนใหม่ทุก 1 วินาที
+                setInterval(fetchScores, 5000); // 1000ms = 1 วินาที
+           
+            // 3. ตั้งค่า Timer Control
+            const startButton = document.getElementById('start-button');
+            const timerDisplay = document.getElementById('timer-display');
+
+            // 4. ตรวจสอบสถานะเกมเมื่อโหลดหน้า
+            if (localStorage.getItem('timerStartTime') && localStorage.getItem('timerDuration')) {
+                  
+                resumeGame(timerDisplay, startButton);
+            } else {
+                startButton.addEventListener('click', () => startGame(timerDisplay, startButton));
+            }
+        });
+// ===================================
+        //           TIMER FUNCTIONS
+        // ===================================
+
+        function startGame(timerDisplay, startButton) {
+            const duration = 180 * 60; // 5 นาที (วินาที)
+            
+            localStorage.setItem('timerStartTime', Date.now());
+            localStorage.setItem('timerDuration', duration);
+
+            startButton.disabled = true;
+            startButton.textContent = "กำลังนับถอยหลัง...";
+
+            startTimerInterval(duration, timerDisplay, startButton);
+        }
+
+        function resumeGame(timerDisplay, startButton) {
+            const startTime = Number(localStorage.getItem('timerStartTime'));
+            const duration = Number(localStorage.getItem('timerDuration'));
+            const currentTime = Date.now();
+            
+            const elapsedTimeSeconds = Math.floor((currentTime - startTime) / 1000);
+            let remainingDuration = duration - elapsedTimeSeconds;
+            
+            if (remainingDuration > 0) {
+                startButton.disabled = true;
+                startButton.textContent = "กำลังนับถอยหลัง...";
+                
+                startTimerInterval(remainingDuration, timerDisplay, startButton);
+            } else {
+                localStorage.removeItem('timerStartTime');
+                localStorage.removeItem('timerDuration');
+                endGame(timerDisplay, startButton);
+                
+                startButton.addEventListener('click', () => startGame(timerDisplay, startButton));
+            }
+        }
+        
+        function startTimerInterval(initialDuration, timerDisplay, startButton) {
+            let duration = initialDuration;
+            updateTimerDisplay(duration, timerDisplay);
+
+            timerInterval = setInterval(() => {
+                duration -= 1;
+                updateTimerDisplay(duration, timerDisplay);
+
+                if (duration <= 0) {
+                    localStorage.removeItem('timerStartTime');
+                    localStorage.removeItem('timerDuration');
+                    endGame(timerDisplay, startButton);
+                }
+            }, 1000);
+        }
+
+        function endGame(timerDisplay, startButton) {
+            clearInterval(timerInterval);
+            timerDisplay.textContent = "หมดเวลา!";
+            
+            startButton.disabled = false;
+            startButton.textContent = "เริ่มใหม่ (5 นาที)";
+        }
+        
+        function updateTimerDisplay(seconds, displayElement) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            displayElement.textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+        // 1. ฟังก์ชันดึงคะแนน
+        async function fetchScores() {
+            try {
+                // เพิ่ม ?action=getScores ต่อท้าย URL
+                const response = await fetch(WEB_APP_URL + '?action=getScores');
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    // ถ้าสำเร็จ ให้ไปอัปเดตหน้าจอ
+                
+                    updateChartUI(result.data);
+                } else {
+                    console.error('Error fetching scores:', result.message);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        }
+// 2. ฟังก์ชันอัปเดตหน้าจอ (กราฟ) - (เวอร์ชันแก้ไขด้วย setTimeout)
+  /**
+         * ฟังก์ชันสำหรับจัดอันดับและเรียงลำดับ
+         */
+     
+
+        // 2. ฟังก์ชันอัปเดตหน้าจอ (กราฟ) - (เวอร์ชันใช้ Pixels)
+ function updateChartUI(scoreData) {
+    const container = document.getElementById('chart-container');
+    
+    // 1. ตรวจสอบและแปลงข้อมูลให้เป็นตัวเลขที่ถูกต้องก่อน
+    const formattedData = scoreData.map(item => ({
+        team: item.team,
+        score: Number(item.score) || 0
+    }));
+
+    // 2. เรียงลำดับข้อมูลใหม่ทุกครั้ง (มากไปน้อย)
+    formattedData.sort((a, b) => b.score - a.score);
+
+    // 3. หาค่าสูงสุดเพื่อคำนวณความสูงแท่ง
+    const maxScoreValue = Math.max(...formattedData.map(d => d.score)) || 1;
+
+    // ❗️ หัวใจสำคัญ: ล้างเนื้อหาเดิมทิ้งทั้งหมดก่อนวาดใหม่ตามลำดับที่เรียงแล้ว
+    container.innerHTML = ''; 
+
+    // 4. วนลูปสร้างแท่งกราฟใหม่ตามลำดับความเก่ง (Ranking)
+    formattedData.forEach((item, index) => {
+        // คำนวณความสูง
+        const barHeight = (item.score / maxScoreValue) * MAX_BAR_HEIGHT_PIXELS ;
+
+        // สร้าง Wrapper สำหรับแต่ละทีม
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bar-wrapper';
+        
+        // ใส่ HTML โครงสร้างแท่งกราฟและชื่อทีมเข้าไปพร้อมกัน
+        // วิธีนี้จะทำให้ ชื่อ และ แท่ง ผูกติดกันเสมอ ไม่ว่าลำดับจะเปลี่ยนไปอยู่ที่เท่าไหร่
+        wrapper.innerHTML = `
+            <div class="bar" style="height: ${barHeight}px;">
+                <img src="${BEER_ICON_URL}" class="bar-icon">
+                <span class="bar-score">${item.score}</span>
+            </div>
+            <div class="team-label">${item.team}</div>
+        `;
+
+        container.appendChild(wrapper);
+    });
+}</script>
+</body>
+</html>

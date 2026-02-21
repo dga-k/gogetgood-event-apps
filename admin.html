@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+     <script src="auth.js"></script>
+    <title>Admin System - Registration Builder</title>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20 font-sans">
+
+    <div class="max-w-6xl mx-auto p-4 md:p-10 space-y-10">
+        
+        <section class="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-800">📋 จัดการประเภทข้อมูล</h2>
+                    <p class="text-slate-400 text-sm">กำหนดหัวข้อที่ต้องการให้เลือกในฟอร์ม</p>
+                </div>
+                <button onclick="openFieldModal()" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                    + เพิ่มฟิลด์ใหม่
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                        <tr>
+                            <th class="p-4">ชื่อฟิลด์</th>
+                            <th class="p-4">ประเภท</th>
+                            <th class="p-4">ตัวเลือก</th>
+                            <th class="p-4 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fields-list-table" class="divide-y divide-slate-100">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="flex flex-col lg:flex-row gap-8">
+            <div class="flex-1 bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-8">
+                <h2 class="text-2xl font-black text-slate-800">🛠 สร้างหน้าลงทะเบียนใหม่</h2>
+                
+                <div class="space-y-4">
+                    <label class="block text-sm font-bold text-slate-500">ชื่อโปรเจกต์ / งาน</label>
+                    <input type="text" id="reg-title" oninput="updatePreview()" class="w-full p-4 bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200 outline-indigo-500" placeholder="เช่น ลงทะเบียนรับเสื้อกิจกรรม">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-500 mb-1">BG Image (URL)</label>
+                            <input type="text" id="bg-url" oninput="updatePreview()" class="w-full p-4 bg-slate-50 rounded-2xl border-none ring-1 ring-slate-200" placeholder="https://...">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-500 mb-1">หรือเลือกสี</label>
+                            <input type="color" id="bg-color" oninput="updatePreview()" value="#f1f5f9" class="w-full h-[56px] p-1 bg-slate-50 rounded-2xl cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <label class="block text-sm font-bold text-slate-500">เลือกข้อมูลที่ต้องการใช้ในฟอร์มนี้</label>
+                    <div id="form-builder-selection" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        </div>
+                </div>
+
+                <button onclick="saveRegistration()" class="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100">
+                    บันทึกและสร้างลิ้งก์ลงทะเบียน
+                </button>
+            </div>
+
+            <div class="lg:w-80 flex-shrink-0">
+                <div class="sticky top-10 border-[10px] border-slate-900 rounded-[3rem] aspect-[9/18] shadow-2xl overflow-hidden bg-white relative">
+                    <div id="pre-bg" class="absolute inset-0 bg-cover bg-center transition-all"></div>
+                    <div class="relative p-6 pt-10">
+                        <div class="bg-white/90 backdrop-blur shadow-xl rounded-2xl p-4 border border-white/50">
+                            <h4 id="pre-title" class="font-bold text-center text-slate-800 mb-4 text-xs">ชื่อโครงการ</h4>
+                            <div id="pre-fields" class="space-y-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="field-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <h3 id="modal-title" class="text-xl font-black mb-6 text-slate-800">เพิ่มฟิลด์ใหม่</h3>
+            <div class="space-y-4">
+                <input type="hidden" id="edit-field-id">
+                <input type="text" id="field-label" placeholder="ชื่อหัวข้อ เช่น ไซส์เสื้อ" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
+                <select id="field-type" onchange="toggleOptions()" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
+                    <option value="text">ข้อความ (Text)</option>
+                    <option value="number">ตัวเลข (Number)</option>
+                    <option value="radio">ตัวเลือก (Radio)</option>
+                    <option value="address_th">ที่อยู่ไทย (Dropdown)</option>
+                </select>
+                <div id="opt-box" class="hidden">
+                    <input type="text" id="field-options" placeholder="ตัวเลือก (แยกด้วยคอมม่า เช่น S, M, L)" class="w-full p-4 bg-slate-50 rounded-2xl ring-1 ring-slate-200 outline-none">
+                </div>
+            </div>
+            <div class="flex gap-4 mt-8">
+                <button onclick="closeFieldModal()" class="flex-1 font-bold text-slate-400">ยกเลิก</button>
+                <button onclick="saveField()" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+     
+        let allFields = [];
+
+        async function init() {
+            await loadFields();
+        }
+
+        // --- ส่วนจัดการฟิลด์ (CRUD) ---
+        async function loadFields() {
+            const { data } = await _supabase.from('form_fields').select('*').order('created_at', {ascending: true});
+            allFields = data || [];
+            
+            // อัปเดตตาราง
+            const table = document.getElementById('fields-list-table');
+            table.innerHTML = allFields.map(f => `
+                <tr class="text-sm">
+                    <td class="p-4 font-bold text-slate-700">${f.label}</td>
+                    <td class="p-4 text-indigo-600 font-medium">${f.field_type}</td>
+                    <td class="p-4 text-slate-400">${f.options.length > 0 ? f.options.join(', ') : '-'}</td>
+                    <td class="p-4 flex justify-center gap-3">
+                        <button onclick='editField(${JSON.stringify(f)})' class="text-amber-500 font-bold">แก้ไข</button>
+                        <button onclick="deleteField('${f.id}')" class="text-red-500 font-bold">ลบ</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // อัปเดต Checkbox ในส่วนสร้างงาน
+            const selection = document.getElementById('form-builder-selection');
+            selection.innerHTML = allFields.map(f => `
+                <label class="flex items-center p-4 bg-slate-50 rounded-2xl cursor-pointer border-2 border-transparent has-[:checked]:border-indigo-500">
+                    <input type="checkbox" name="f-check" value="${f.id}" onchange="updatePreview()" class="w-5 h-5 accent-indigo-600">
+                    <span class="ml-3 font-bold text-slate-600 text-sm">${f.label}</span>
+                </label>
+            `).join('');
+        }
+
+        async function saveField() {
+            const id = document.getElementById('edit-field-id').value;
+            const label = document.getElementById('field-label').value;
+            const field_type = document.getElementById('field-type').value;
+            const options = document.getElementById('field-options').value.split(',').map(s => s.trim()).filter(s => s);
+
+            const payload = { label, field_type, options };
+            if(id) await _supabase.from('form_fields').update(payload).eq('id', id);
+            else await _supabase.from('form_fields').insert([payload]);
+
+            closeFieldModal();
+            loadFields();
+        }
+
+        async function deleteField(id) {
+            if(confirm('ยืนยันการลบ?')) {
+                await _supabase.from('form_fields').delete().eq('id', id);
+                loadFields();
+            }
+        }
+
+        // --- ส่วนสร้างงานลงทะเบียน ---
+        function updatePreview() {
+            document.getElementById('pre-title').innerText = document.getElementById('reg-title').value || 'ชื่อโครงการ';
+            const bg = document.getElementById('pre-bg');
+            bg.style.backgroundImage = `url('${document.getElementById('bg-url').value}')`;
+            bg.style.backgroundColor = document.getElementById('bg-color').value;
+
+            const selectedIds = Array.from(document.querySelectorAll('input[name="f-check"]:checked')).map(el => el.value);
+            document.getElementById('pre-fields').innerHTML = selectedIds.map(() => `
+                <div class="h-6 bg-slate-100 rounded-lg border border-dashed border-slate-300"></div>
+            `).join('');
+        }
+
+        async function saveRegistration() {
+            const selectedIds = Array.from(document.querySelectorAll('input[name="f-check"]:checked')).map(el => el.value);
+            const config = allFields.filter(f => selectedIds.includes(f.id));
+
+            const { data, error } = await _supabase.from('registrations').insert([{
+                title: document.getElementById('reg-title').value,
+                bg_url: document.getElementById('bg-url').value,
+                bg_color: document.getElementById('bg-color').value,
+                form_config: config
+            }]).select();
+
+            if(!error) alert("สร้างสำเร็จ! ลิ้งก์ของคุณคือ: register.html?id=" + data[0].id);
+        }
+
+        // Modal Helpers
+        function openFieldModal() { 
+            document.getElementById('field-modal').classList.remove('hidden'); 
+            document.getElementById('edit-field-id').value = "";
+        }
+        function closeFieldModal() { document.getElementById('field-modal').classList.add('hidden'); }
+        function toggleOptions() { 
+            const type = document.getElementById('field-type').value;
+            document.getElementById('opt-box').classList.toggle('hidden', type !== 'radio');
+        }
+        function editField(f) {
+            openFieldModal();
+            document.getElementById('edit-field-id').value = f.id;
+            document.getElementById('field-label').value = f.label;
+            document.getElementById('field-type').value = f.field_type;
+            document.getElementById('field-options').value = f.options.join(',');
+            toggleOptions();
+        }
+
+        init();
+    </script>
+</body>
+</html>

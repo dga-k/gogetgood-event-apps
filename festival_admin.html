@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Event Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <style>
+        body {  background-image: url('Challenge-02.png'); font-family: 'Kanit', sans-serif; color: white; padding: 20px; }
+        .section {background: #212325; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #444; }
+        input, select { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #333; color: white; margin-bottom: 10px; }
+        button { padding: 10px 20px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+        .btn-green { background: #00ffcc; color: black; }
+        .btn-blue { background: #3498db; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border-bottom: 1px solid #444; text-align: left; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard จัดการงาน</h1>
+
+    <div class="section">
+        <h2>1. สร้างงานใหม่ (Event)</h2>
+        <input type="text" id="event-name-input" placeholder="ชื่อครั้งที่จัด (เช่น FEST 2026)">
+        <button class="btn-green" onclick="addEvent()">สร้างงาน</button>
+    </div>
+
+    <div class="section">
+        <h2>2. เลือกงานและเพิ่มทีม</h2>
+        <select id="event-select" onchange="loadTeams()"></select>
+        <hr>
+        <input type="text" id="team-name-input" placeholder="ชื่อทีม...">
+        <button class="btn-blue" onclick="addTeam()">+ เพิ่มทีมเข้างานนี้</button>
+        
+        <table id="team-table">
+            <thead><tr><th>ชื่อทีม</th><th>คะแนน</th><th>จัดการ</th></tr></thead>
+            <tbody id="team-list"></tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>3. สถิติเปรียบเทียบทุกครั้ง</h2>
+        <div id="stats-container">กำลังคำนวณ...</div>
+    </div>
+
+    <script>
+
+    
+
+        async function loadEvents() {
+            const { data } = await _supabase.from('events_festival').select('*').order('created_at', {ascending: false});
+            const select = document.getElementById('event-select');
+            select.innerHTML = data.map(ev => `<option value="${ev.id}">${ev.event_name}</option>`).join('');
+            loadTeams();
+            calculateStats(data);
+        }
+
+       async function loadTeams() {
+            const eventSelect = document.getElementById('event-select');
+            const eventId = eventSelect.value;
+
+            // ❗️ เพิ่มการเช็คตรงนี้: ถ้าไม่มีค่า ID (เช่น ยังไม่ได้สร้างงาน) ให้หยุดทำงานทันที
+            if (!eventId || eventId === "") {
+                document.getElementById('team-list').innerHTML = '<tr><td colspan="3">กรุณาเลือกหรือสร้างงานก่อน</td></tr>';
+                return;
+            }
+
+            const { data, error } = await _supabase
+                .from('teams')
+                .select('*')
+                .eq('event_id', eventId)
+                .order('score', {ascending: false});
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            const tbody = document.getElementById('team-list');
+            tbody.innerHTML = data.map(t => `
+                <tr>
+                    <td>${t.team_name}</td>
+                    <td>${t.score}</td>
+                    <td><button onclick="deleteTeam('${t.id}')" style="background:red; color:white;">ลบ</button></td>
+                </tr>
+            `).join('');
+        }
+        async function createEvent() {
+            const name = document.getElementById('event-name-input').value;
+            alert(name);
+           // if(!name) return;
+           // await _supabase.from('events_festival').insert([{ event_name: name }]);
+            //alert('สร้างงานสำเร็จ');
+            //location.reload();
+        }
+        async function addEvent() {
+            const name = document.getElementById('event-name-input').value;
+            if(!name) return;
+           await _supabase.from('events_festival').insert([{ event_name: name }]);
+            alert('สร้างงานสำเร็จ');
+            location.reload();
+        }
+        async function addTeam() {
+            const eventId = document.getElementById('event-select').value;
+            const name = document.getElementById('team-name-input').value;
+            if(!name || !eventId) return;
+            await _supabase.from('teams').insert([{ event_id: eventId, team_name: name }]);
+            document.getElementById('team-name-input').value = '';
+            loadTeams();
+        }
+
+        async function calculateStats(events) {
+            let html = '<ul>';
+            
+            for (let ev of events) {
+                // ดึงทั้งชื่อทีมและคะแนน เพื่อหาว่าใครได้สูงสุด
+                const { data: teams, error } = await _supabase
+                    .from('teams')
+                    .select('team_name, score')
+                    .eq('event_id', ev.id);
+
+                if (error || !teams || teams.length === 0) {
+                    html += `<li><strong>${ev.event_name}</strong>: ยังไม่มีข้อมูลทีม</li>`;
+                    continue;
+                }
+
+                // 1. คำนวณคะแนนรวมทั้งหมดในงานนั้น
+                const total = teams.reduce((acc, curr) => acc + curr.score, 0);
+
+                // 2. หาคะแนนที่สูงที่สุดในงานนั้น
+                const maxScore = Math.max(...teams.map(t => t.score));
+
+                // 3. หาชื่อทีมที่ได้คะแนนสูงสุด (กรณีมีหลายทีมที่คะแนนเท่ากันจะดึงมาทั้งหมด)
+                const topTeams = teams
+                    .filter(t => t.score === maxScore && maxScore > 0)
+                    .map(t => t.team_name)
+                    .join(', ');
+
+                html += `
+                    <li style="margin-bottom: 10px;">
+                        <strong>${ev.event_name}</strong>: <br>
+                        <span>📊 คะแนนรวมทุกทีม: ${total.toLocaleString()} คะแนน</span><br>
+                        <span style="color: #00ffcc;">🏆 คะแนนสูงสุด: ${maxScore.toLocaleString()} 
+                        ${topTeams ? `(ทีม: ${topTeams})` : ''}</span>
+                    </li>`;
+            }
+            
+            document.getElementById('stats-container').innerHTML = html + '</ul>';
+        }
+
+        async function deleteTeam(id) {
+            if(confirm('ลบทีมนี้?')) {
+                await _supabase.from('teams').delete().eq('id', id);
+                loadTeams();
+            }
+        }
+
+        loadEvents();
+    </script>
+</body>
+</html>

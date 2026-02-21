@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vote - ดื่มลืมโลก</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {  background-image: url('Challenge-02.png'); color: white; font-family: 'Kanit', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 2px solid #00ffcc; width: 90%; max-width: 400px; text-align: center; }
+        select { width: 100%; padding: 15px; margin: 20px 0; border-radius: 10px; background: #222; color: white; border: 1px solid #ffd700; font-size: 1.1rem; }
+        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: #00ffcc; color: black; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
+        button:disabled { background: #444; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>โหวตทีมที่คุณเชียร์</h2>
+        <select id="team-dropdown"><option>กำลังโหลดทีม...</option></select>
+        <button id="vote-btn" disabled>ส่งคะแนนโหวต</button>
+        <p id="msg"></p>
+    </div>
+
+    <script>
+       
+
+        async function init() {
+            // ดึง Event ล่าสุดที่เปิดอยู่
+            const { data: events } = await _supabase.from('events_festival').select('*').order('created_at', {ascending: false}).limit(1);
+            if(events.length > 0) {
+                const { data: teams } = await _supabase.from('teams').select('*').eq('event_id', events[0].id).order('team_name');
+                const dropdown = document.getElementById('team-dropdown');
+                dropdown.innerHTML = '<option value="" disabled selected>-- เลือกทีม --</option>' + 
+                                     teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+                
+                document.getElementById('vote-btn').onclick = () => handleVote(dropdown.value);
+                dropdown.onchange = () => document.getElementById('vote-btn').disabled = false;
+            }
+        }
+
+        async function handleVote(teamId) {
+            const btn = document.getElementById('vote-btn');
+            btn.disabled = true;
+            btn.textContent = 'กำลังบันทึก...';
+
+            // ดึงคะแนนปัจจุบันและบวก 1
+            const { data } = await _supabase.from('teams').select('score').eq('id', teamId).single();
+            await _supabase.from('teams').update({ score: data.score + 1 }).eq('id', teamId);
+
+            document.getElementById('msg').innerHTML = "✅ โหวตสำเร็จ!";
+            btn.textContent = 'โหวตเรียบร้อย';
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
