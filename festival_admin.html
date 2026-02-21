@@ -29,6 +29,8 @@
         <h2>2. เลือกงานและเพิ่มทีม</h2>
         <select id="event-select" onchange="loadTeams()"></select>
         <hr>
+        <div id="event-list-container">กำลังคำนวณ...</div>
+       
         <input type="text" id="team-name-input" placeholder="ชื่อทีม...">
         <button class="btn-blue" onclick="addTeam()">+ เพิ่มทีมเข้างานนี้</button>
         
@@ -51,12 +53,14 @@
             const { data } = await _supabase.from('events_festival').select('*').order('created_at', {ascending: false});
             const select = document.getElementById('event-select');
             select.innerHTML = data.map(ev => `<option value="${ev.id}">${ev.event_name}</option>`).join('');
+            
             loadTeams();
             calculateStats(data);
         }
 
        async function loadTeams() {
             const eventSelect = document.getElementById('event-select');
+            const eventName = eventSelect.options[eventSelect.selectedIndex].text;
             const eventId = eventSelect.value;
 
             // ❗️ เพิ่มการเช็คตรงนี้: ถ้าไม่มีค่า ID (เช่น ยังไม่ได้สร้างงาน) ให้หยุดทำงานทันที
@@ -75,7 +79,17 @@
                 console.error(error);
                 return;
             }
-
+            // 1. แสดงเฉพาะ Event ที่เลือกในส่วน "รายชื่อโครงการ"
+            const container = document.getElementById('event-list-container');
+            container.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#00ffcc; padding:15px; border-radius:8px; color: black;">
+                    <span><strong>กำลังจัดการงาน: ${eventName}</strong></span>
+                    <div>
+                        <a href="festival_index.html?eventId=${eventId}" target="_blank" class="btn-link" style="background:#1a1a1a; color:white;">🔗 ไปหน้าโหวต</a>
+                        <a href="festival_scoreboard.html?eventId=${eventId}" target="_blank" class="btn-link" style="background:#1a1a1a; color:white;">📊 ดูคะแนนสด</a>
+                    </div>
+                </div>
+            `;
             const tbody = document.getElementById('team-list');
             tbody.innerHTML = data.map(t => `
                 <tr>
