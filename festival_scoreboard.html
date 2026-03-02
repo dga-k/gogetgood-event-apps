@@ -5,145 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scoreboard - ดื่มลืมโลก FESTIVAL</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="auth.js"></script>
-    <style>
+    <script src="auth.js"></script> <style>
         body {
             background: #000 url('Challenge-02.png') no-repeat center center fixed;
             background-size: cover;
             font-family: 'Play', sans-serif;
-            margin: 0;
-            padding: 0;
-            height: 100%; 
-            color: white;
-            overflow-x: hidden; /* ห้ามเลื่อนทั้งหน้าจอ แต่จะไปเลื่อนที่ container กราฟแทน */
+            margin: 0; padding: 0; color: white; overflow-x: hidden;
         }
 
-        h1 {
-            color: #FFD700;
-            font-size: 3rem;
-            text-shadow: 2px 2px 4px #000;
-            text-align: center;
-            margin: 20px 0;
-        }
-
+        /* Header & Timer Section */
         #timer-controls {
-            padding: 20px;
-            text-align: center;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
+            padding: 30px; text-align: center;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(255, 193, 7, 0.3);
         }
 
         #timer-display {
-            font-size: 4rem;
-            font-weight: bold;
-            color: #FFC107;
-            text-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
+            font-size: 5rem; font-weight: bold; color: #FFC107;
+            text-shadow: 0 0 30px rgba(255, 193, 7, 0.6); font-family: monospace;
         }
 
-        #start-button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            font-size: 1.2rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: 0.3s;
+        .btn-group { margin-top: 15px; display: flex; justify-content: center; gap: 15px; }
+        
+        button {
+            padding: 15px 35px; font-size: 1.2rem; border-radius: 12px;
+            cursor: pointer; transition: 0.3s; font-weight: bold; border: none;
         }
 
-        #start-button:disabled { background-color: #555; cursor: not-allowed; }
+        #start-button { background: #4CAF50; color: white; }
+        #start-button:disabled { background: #2e4d30; color: #888; cursor: not-allowed; }
+        
+        #reset-button { background: #f44336; color: white; }
+        #reset-button:hover { background: #d32f2f; }
 
-        /* ❗️ ปรับ Container ให้ Scroll แนวนอนได้เมื่อทีมเยอะ ❗️ */
+        h1 {
+            color: #FFD700; font-size: 3.5rem; text-align: center;
+            margin: 40px 0; text-shadow: 3px 3px 10px #000; letter-spacing: 5px;
+        }
+
+        /* Chart Section */
         #chart-container {
-            display: flex;
-            justify-content: flex-start; /* เปลี่ยนจาก around เป็น start เพื่อให้เลื่อนได้ */
-            align-items: flex-end;
-            height: 550px;
-            margin: 50px auto;
-            padding: 20px 50px;
-            border-bottom: 3px solid rgba(255, 255, 255, 0.2);
-            overflow-x: auto; /* เปิด Scroll แนวนอน */
-            overflow-y: hidden;
-            white-space: nowrap;
-            width: 95%;
-            gap: 30px; /* ระยะห่างระหว่างแท่ง */
+            display: flex; justify-content: flex-start; align-items: flex-end;
+            height: 550px; margin: 20px auto; padding: 20px 50px;
+            overflow-x: auto; white-space: nowrap; width: 90%; gap: 40px;
+            border-bottom: 4px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* ปรับแต่ง Scrollbar */
-        #chart-container::-webkit-scrollbar { height: 8px; }
+        #chart-container::-webkit-scrollbar { height: 10px; }
         #chart-container::-webkit-scrollbar-thumb { background: #FFC107; border-radius: 10px; }
 
         .bar-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0; /* ❗️ ห้ามโดนบีบขนาด ❗️ */
-            width: 100px;
-            animation: fadeIn 0.5s ease;
+            display: flex; flex-direction: column; align-items: center;
+            flex-shrink: 0; width: 120px; animation: fadeIn 0.8s ease;
         }
 
         .bar {
-            width: 80px;
-            background: linear-gradient(to top, #FFC107, #FFD700);
-            border-radius: 10px 10px 0 0;
-            box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
-            position: relative;
-            transition: height 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            width: 90px; background: linear-gradient(to top, #FFC107, #FFD700);
+            border-radius: 15px 15px 0 0; position: relative;
+            transition: height 1s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+            box-shadow: 0 0 25px rgba(255, 193, 7, 0.3);
         }
 
         .bar-icon {
-            width: 70px;
-            height: 70px;
-            position: absolute;
-            top: -60px;
-            left: 50%;
-            transform: translateX(-50%);
+            width: 80px; height: 80px; position: absolute;
+            top: -75px; left: 50%; transform: translateX(-50%);
         }
 
         .bar-score {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 2px 2px 4px #000;
-            position: absolute;
-            width: 100%;
-            text-align: center;
-            top: 10px;
+            font-size: 2.2rem; font-weight: bold; color: #fff;
+            text-shadow: 2px 2px 5px #000; position: absolute;
+            width: 100%; text-align: center; top: 15px;
         }
 
         .team-label {
-            background-color: rgba(3, 73, 36, 0.9);
-            color: #fff;
-            font-size: 1rem;
-            text-align: center;
-            border-radius: 8px;
-            padding: 8px;
-            margin-top: 15px;
-            width: 100%;
-            white-space: normal;
-            word-wrap: break-word;
-            min-height: 40px;
+            background: rgba(3, 73, 36, 0.9); color: #fff;
+            font-size: 1.1rem; text-align: center; border-radius: 10px;
+            padding: 10px; margin-top: 20px; width: 100%;
+            border: 1px solid rgba(255,255,255,0.2);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (max-width: 768px) {
-            #chart-container { height: 400px; padding: 20px; }
-            .bar-wrapper { width: 70px; }
-            .bar { width: 50px; }
-            .bar-icon { width: 45px; height: 45px; top: -40px; }
-            .bar-score { font-size: 1.2rem; }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
     <div id="timer-controls">
         <div id="timer-display">180:00</div>
-        <button id="start-button">เริ่มนับถอยหลัง</button>
+        <div class="btn-group">
+            <button id="start-button" onclick="startGame()">▶ เริ่มนับถอยหลัง</button>
+            <button id="reset-button" onclick="resetGame()">🔄 RESET ทั้งระบบ</button>
+        </div>
     </div>
 
     <h1>LIVE SCOREBOARD</h1>
@@ -152,132 +103,129 @@
         </div>
 
     <script>
-        // --- ❗️ ตั้งค่า SUPABASE ❗️ ---
         const urlParams = new URLSearchParams(window.location.search);
         let currentEventId = urlParams.get('eventId');
         const BEER_ICON_URL = 'https://gogetgood.com/changefestival/Obj-02-2.png';
-        const MAX_BAR_HEIGHT_PIXELS = 400;
+        const MAX_BAR_HEIGHT = 400;
+        const GAME_DURATION_SEC = 180 * 60; // 180 นาที
         let timerInterval = null;
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            // 1. ดึงข้อมูลครั้งแรก
-            fetchScores();
-
-            // 2. ❗️ ระบบ REAL-TIME: ดักฟังเมื่อมีการ Update คะแนนจากหน้าโหวต ❗️
-            _supabase.channel('custom-all-channel')
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, (payload) => {
-                    console.log('คะแนนเปลี่ยน!', payload);
-                    fetchScores(); // อัปเดตกราฟทันที
-                })
-                .subscribe();
-
-            // 3. ตั้งค่า Timer
-            const startButton = document.getElementById('start-button');
-            const timerDisplay = document.getElementById('timer-display');
-
-            if (localStorage.getItem('timerStartTime')) {
-                resumeGame(timerDisplay, startButton);
-            }
-
-            startButton.addEventListener('click', () => startGame(timerDisplay, startButton));
-        });
-
-        // --- 📊 ดึงข้อมูลจาก SUPABASE ---
-        async function fetchScores() {
-            try {
-                // ดึงงานล่าสุด
-                // ก่อน (Event ล่าสุด)
-                if(!currentEventId) {
-                const { data } = await _supabase.from('events_festival').select('id, event_name').order('created_at', {ascending: false}).limit(1);
+        // 1. เริ่มต้นระบบ
+        async function init() {
+            if(!currentEventId) {
+                const { data } = await _supabase.from('events_festival').select('id').order('created_at', {ascending: false}).limit(1);
                 if(data.length > 0) currentEventId = data[0].id;
-                }
-                if(!currentEventId) return;
-                //const { data: events } = await _supabase.from('events_festival').select('id').order('created_at', { ascending: false }).limit(1);
-                
-               // if (!events || events.length === 0) return;
-
-                // ดึงทีมที่อยู่ใน Event นั้น
-                const { data: teams, error } = await _supabase
-                    .from('teams')
-                    .select('*')
-                    .eq('event_id', currentEventId)
-                    .order('score', { ascending: false });
-
-                if (error) throw error;
-                updateChartUI(teams);
-            } catch (error) {
-                console.error('Error:', error.message);
             }
+            if(!currentEventId) return alert("ไม่พบข้อมูล Event");
+
+            fetchScores();
+            syncTimer(); // ดึงสถานะเวลาจาก DB
+
+            // Real-time Listeners
+            _supabase.channel('game-sync')
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, fetchScores)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events_festival' }, syncTimer)
+                .subscribe();
+        }
+
+        // 2. ดึงคะแนนและอัปเดตกราฟ
+        async function fetchScores() {
+            const { data: teams, error } = await _supabase
+                .from('teams')
+                .select('*')
+                .eq('event_id', currentEventId)
+                .order('score', { ascending: false });
+
+            if (!error) updateChartUI(teams);
         }
 
         function updateChartUI(scoreData) {
             const container = document.getElementById('chart-container');
-            if (scoreData.length === 0) return;
-
-            const maxScoreValue = Math.max(...scoreData.map(d => d.score)) || 1;
-            container.innerHTML = ''; 
-
-            scoreData.forEach((item) => {
-                const barHeight = (item.score / maxScoreValue) * MAX_BAR_HEIGHT_PIXELS;
-                const wrapper = document.createElement('div');
-                wrapper.className = 'bar-wrapper';
-                
-                wrapper.innerHTML = `
-                    <div class="bar" style="height: ${barHeight}px;">
-                        <img src="${BEER_ICON_URL}" class="bar-icon">
-                        <span class="bar-score">${item.score}</span>
+            const maxScore = Math.max(...scoreData.map(d => d.score)) || 1;
+            
+            container.innerHTML = scoreData.map(item => {
+                const height = (item.score / maxScore) * MAX_BAR_HEIGHT;
+                return `
+                    <div class="bar-wrapper">
+                        <div class="bar" style="height: ${height}px;">
+                            <img src="${BEER_ICON_URL}" class="bar-icon">
+                            <span class="bar-score">${item.score}</span>
+                        </div>
+                        <div class="team-label">${item.team_name}</div>
                     </div>
-                    <div class="team-label">${item.team_name}</div>
                 `;
-                container.appendChild(wrapper);
-            });
+            }).join('');
         }
 
-        // --- ⏱ TIMER LOGIC (เหมือนเดิมแต่ปรับปรุงความเสถียร) ---
-        function startGame(timerDisplay, startButton) {
-            const duration = 180 * 60;
-            localStorage.setItem('timerStartTime', Date.now());
-            localStorage.setItem('timerDuration', duration);
-            startButton.disabled = true;
-            startTimerInterval(duration, timerDisplay, startButton);
-        }
+        // 3. ระบบจัดการเวลา (Sync กับ Supabase)
+        async function syncTimer() {
+            const { data: event } = await _supabase
+                .from('events_festival')
+                .select('timer_start_time, is_timer_running')
+                .eq('id', currentEventId)
+                .single();
 
-        function resumeGame(timerDisplay, startButton) {
-            const startTime = Number(localStorage.getItem('timerStartTime'));
-            const duration = Number(localStorage.getItem('timerDuration'));
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const remaining = duration - elapsed;
+            const timerDisplay = document.getElementById('timer-display');
+            const startBtn = document.getElementById('start-button');
 
-            if (remaining > 0) {
-                startButton.disabled = true;
-                startTimerInterval(remaining, timerDisplay, startButton);
+            if (event?.is_timer_running && event?.timer_start_time) {
+                const startTime = new Date(event.timer_start_time).getTime();
+                startBtn.disabled = true;
+
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const remaining = GAME_DURATION_SEC - elapsed;
+
+                    if (remaining <= 0) {
+                        clearInterval(timerInterval);
+                        timerDisplay.textContent = "หมดเวลา!";
+                        timerDisplay.style.color = "#ff4444";
+                        startBtn.disabled = false;
+                    } else {
+                        renderTimer(remaining);
+                    }
+                }, 1000);
+            } else {
+                if (timerInterval) clearInterval(timerInterval);
+                timerDisplay.textContent = "180:00";
+                timerDisplay.style.color = "#FFC107";
+                startBtn.disabled = false;
             }
         }
 
-        function startTimerInterval(initialDuration, timerDisplay, startButton) {
-            let duration = initialDuration;
-            clearInterval(timerInterval);
-            updateTimerDisplay(duration, timerDisplay);
-
-            timerInterval = setInterval(() => {
-                duration--;
-                updateTimerDisplay(duration, timerDisplay);
-                if (duration <= 0) {
-                    clearInterval(timerInterval);
-                    timerDisplay.textContent = "หมดเวลา!";
-                    startButton.disabled = false;
-                }
-            }, 1000);
-        }
-
-        function updateTimerDisplay(seconds, displayElement) {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
+        function renderTimer(seconds) {
+            const m = Math.floor(seconds / 60);
             const s = seconds % 60;
-            displayElement.textContent = `${String(m + (h*60)).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            document.getElementById('timer-display').textContent = 
+                `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
-        _supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, fetchScores).subscribe();
-        fetchScores();
+
+        // 4. ปุ่มควบคุม (Write to Supabase)
+        async function startGame() {
+            await _supabase.from('events_festival')
+                .update({ timer_start_time: new Date().toISOString(), is_timer_running: true })
+                .eq('id', currentEventId);
+        }
+
+        async function resetGame() {
+            if (!confirm("⚠️ คำเตือน: ระบบจะทำการรีเซ็ตคะแนนทุกทีมเป็น 0 และเริ่มเวลาใหม่ !!")) return;
+
+            // รีเซ็ตเวลาใน Event
+            const task1 = _supabase.from('events_festival')
+                .update({ timer_start_time: null, is_timer_running: false })
+                .eq('id', currentEventId);
+
+            // รีเซ็ตคะแนนใน Teams
+            const task2 = _supabase.from('teams')
+                .update({ score: 0 })
+                .eq('event_id', currentEventId);
+
+            await Promise.all([task1, task2]);
+            alert("รีเซ็ตระบบเรียบร้อย!");
+        }
+
+        init();
     </script>
 </body>
 </html>
