@@ -5,18 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vote - เลือกงานและทีม</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <script src="auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { background-image: url('Challenge-02.png');  color: white; font-family: 'Kanit', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 2px solid #00ffcc; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 0 20px rgba(0,255,204,0.2); }
+        .card { background: #1a1a1a; padding: 30px; border-radius: 20px; border: 2px solid #00ffcc; width: 90%; max-width: 450px; text-align: center; box-shadow: 0 0 20px rgba(0,255,204,0.2); }
         h2 { color: #ffd700; margin-bottom: 25px; }
-        label { display: block; text-align: left; margin-bottom: 5px; color: #ccc; font-size: 0.9rem; }
-        select { width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; background: #222; color: white; border: 1px solid #444; font-size: 1rem; }
-        select:focus { border-color: #00ffcc; outline: none; }
-        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: #00ffcc; color: black; font-weight: bold; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        label { display: block; text-align: left; margin-bottom: 8px; color: #ccc; font-size: 0.9rem; }
+        
+        /* ตกแต่ง Tom Select ให้เข้ากับธีม */
+        .ts-control { background: #222 !important; color: white !important; border: 1px solid #444 !important; border-radius: 10px !important; padding: 12px !important; }
+        .ts-dropdown { background: #222 !important; color: white !important; border: 1px solid #444 !important; }
+        .ts-dropdown .active { background: #00ffcc !important; color: black !important; }
+        .item { color: white !important; }
+
+        .input-group { margin-bottom: 20px; }
+        input[type="number"] { width: 100%; padding: 15px; border-radius: 10px; background: #222; color: white; border: 1px solid #444; font-size: 1.1rem; box-sizing: border-box; }
+        
+        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: #00ffcc; color: black; font-weight: bold; font-size: 1.2rem; cursor: pointer; transition: 0.3s; margin-top: 10px; }
         button:disabled { background: #444; color: #888; cursor: not-allowed; }
-        #msg { margin-top: 15px; font-weight: bold; }
+        #msg { margin-top: 15px; font-weight: bold; min-height: 1.5em; }
         .success { color: #00ffcc; }
         .error { color: #ff4d4d; }
     </style>
@@ -25,83 +35,73 @@
     <div class="card">
         <h2>โหวตทีมของคุณ</h2>
         
-        <label>1. เลือกงานที่ต้องการโหวต:</label>
-        <select id="event-dropdown">
-            <option value="" disabled selected>กำลังโหลดรายชื่อโครงการ...</option>
-        </select>
+        <div class="input-group">
+            <label>1. ค้นหางาน/โครงการ:</label>
+            <select id="event-dropdown" placeholder="พิมพ์เพื่อค้นหางาน..."></select>
+        </div>
 
-        <label>2. เลือกทีม:</label>
-        <select id="team-dropdown" disabled>
-            <option value="" disabled selected>-- กรุณาเลือกงานก่อน --</option>
-        </select>
+        <div class="input-group">
+            <label>2. ค้นหาทีม:</label>
+            <select id="team-dropdown" disabled placeholder="เลือกงานก่อนเพื่อค้นหาทีม..."></select>
+        </div>
+
+        <div class="input-group">
+            <label>3. จำนวนคะแนน:</label>
+            <input type="number" id="score-input" value="1" min="1" max="100">
+        </div>
 
         <button id="vote-btn" disabled>ยืนยันการโหวต</button>
         <p id="msg"></p>
     </div>
 
     <script>
-       
+        // สมมติว่ามี _supabase จาก auth.js แล้ว
         const urlParams = new URLSearchParams(window.location.search);
         const autoEventId = urlParams.get('eventId');
-        const eventDropdown = document.getElementById('event-dropdown');
-        const teamDropdown = document.getElementById('team-dropdown');
-        const voteBtn = document.getElementById('vote-btn');
-        const msg = document.getElementById('msg');
+        
+        let eventSelect, teamSelect; // ตัวแปรสำหรับเก็บ Instance ของ Tom Select
 
-        document.addEventListener('DOMContentLoaded', initEvents);
+        document.addEventListener('DOMContentLoaded', () => {
+            // สร้าง Searchable Dropdown
+            eventSelect = new TomSelect("#event-dropdown", {
+                create: false,
+                onChange: (val) => {
+                    if(val) loadTeams(val);
+                }
+            });
 
-        // 1. ดึงรายชื่อ Event ทั้งหมดที่มีในระบบ
+            teamSelect = new TomSelect("#team-dropdown", {
+                create: false,
+                onChange: (val) => {
+                    document.getElementById('vote-btn').disabled = !val;
+                }
+            });
+
+            initEvents();
+        });
+
         async function initEvents() {
-            const evDrop = document.getElementById('event-dropdown');
-            const teamDrop = document.getElementById('team-dropdown');
-            const voteBtn = document.getElementById('vote-btn');
-
-            // 1. ดึงข้อมูล Event ทั้งหมดมาเตรียมไว้ก่อน
             const { data: events, error } = await _supabase
                 .from('events_festival')
                 .select('*')
                 .order('created_at', {ascending: false});
 
-            if (error || !events || events.length === 0) {
-                evDrop.innerHTML = '<option value="">❌ ไม่พบงานในระบบ</option>';
-                return;
-            }
+            if (error || !events) return;
 
-            // 2. เติมข้อมูลลง Dropdown
-            evDrop.innerHTML = '<option value="" disabled selected>-- เลือกงานที่ต้องการโหวต --</option>' + 
-                events.map(ev => `<option value="${ev.id}">${ev.event_name}</option>`).join('');
-            
-            // 3. ตั้งค่า Event Listener เมื่อมีการเปลี่ยนงาน (กรณีเลือกเอง)
-            evDrop.onchange = (e) => {
-                loadTeams(e.target.value);
-                // รีเซ็ตปุ่มโหวตและข้อความเมื่อเปลี่ยนงาน
-                voteBtn.disabled = true;
-                document.getElementById('msg').textContent = "";
-            };
+            // เพิ่ม Option เข้าไปใน Tom Select
+            const options = events.map(ev => ({ value: ev.id, text: ev.event_name }));
+            eventSelect.addOptions(options);
 
-            // 4. ❗️ หัวใจสำคัญ: ตรวจสอบว่ามีการส่ง ID มาจาก URL หรือไม่
-            if (autoEventId) {
-                // ตรวจสอบว่า ID ที่ส่งมา มีอยู่ในรายการที่โหลดมาหรือไม่
-                const exists = events.find(ev => ev.id === autoEventId);
-                if (exists) {
-                    evDrop.value = autoEventId; // ล็อกงานให้ใน Dropdown
-                    // evDrop.disabled = true; // (ทางเลือก) ถ้าอยากล็อกไม่ให้เขาเปลี่ยนงานเลยให้เปิดบรรทัดนี้
-                    loadTeams(autoEventId);
-                } else {
-                    console.error("Event ID จาก Link ไม่ถูกต้อง");
-                }
+            if (autoEventId && events.find(e => e.id == autoEventId)) {
+                eventSelect.setValue(autoEventId);
             }
         }
 
-        // ฟังก์ชันโหลดทีม (ปรับปรุงเพื่อล้างข้อมูลเก่า)
         async function loadTeams(eventId) {
-            const tDrop = document.getElementById('team-dropdown');
-            const voteBtn = document.getElementById('vote-btn');
+            teamSelect.clear();
+            teamSelect.clearOptions();
+            teamSelect.disable();
             
-            tDrop.innerHTML = '<option value="">กำลังโหลดรายชื่อทีม...</option>';
-            tDrop.disabled = true;
-            voteBtn.disabled = true;
-
             const { data: teams, error } = await _supabase
                 .from('teams')
                 .select('*')
@@ -109,30 +109,27 @@
                 .order('team_name');
 
             if (error || !teams || teams.length === 0) {
-                tDrop.innerHTML = '<option value="">❌ งานนี้ยังไม่มีรายชื่อทีม</option>';
                 return;
             }
 
-            tDrop.innerHTML = '<option value="" disabled selected>-- เลือกทีมของคุณ --</option>' + 
-                teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
-            
-            tDrop.disabled = false;
-            
-            tDrop.onchange = () => {
-                voteBtn.disabled = !tDrop.value;
-            };
-            voteBtn.onclick = () => handleVote(tDrop.value);
-                //dropdown.onchange = () => document.getElementById('vote-btn').disabled = false;
+            const options = teams.map(t => ({ value: t.id, text: t.team_name }));
+            teamSelect.addOptions(options);
+            teamSelect.enable();
         }
-        // 3. ฟังก์ชันส่งโหวต
-        async function handleVote(teamId) {
-            if (!teamId) return;
 
-            voteBtn.disabled = true;
-            voteBtn.textContent = 'กำลังบันทึกคะแนน...';
+        document.getElementById('vote-btn').onclick = async function() {
+            const teamId = teamSelect.getValue();
+            const pointsToAdd = parseInt(document.getElementById('score-input').value) || 1;
+            const msg = document.getElementById('msg');
+            const btn = this;
+
+            if (!teamId || pointsToAdd < 1) return;
+
+            btn.disabled = true;
+            btn.textContent = 'กำลังบันทึก...';
 
             try {
-                // ดึงคะแนนปัจจุบัน
+                // 1. ดึงคะแนนปัจจุบัน
                 const { data, error } = await _supabase
                     .from('teams')
                     .select('score, team_name')
@@ -141,33 +138,28 @@
 
                 if (error) throw error;
 
-                // อัปเดตคะแนน +1
+                // 2. อัปเดตคะแนน (คะแนนเดิม + คะแนนใหม่ที่กรอก)
+                const newScore = (data.score || 0) + pointsToAdd;
+
                 const { error: upError } = await _supabase
                     .from('teams')
-                    .update({ score: data.score + 1 })
+                    .update({ score: newScore ,updated_at:new Date().toISOString()})
                     .eq('id', teamId);
 
                 if (upError) throw upError;
 
-                msg.textContent = `✅ โหวตให้ทีม ${data.team_name} สำเร็จ!`;
+                msg.textContent = `✅ เพิ่มคะแนนให้ ${data.team_name} +${pointsToAdd} แต้มสำเร็จ!`;
                 msg.className = "success";
-                voteBtn.textContent = 'ส่งคะแนนเรียบร้อย';
-
-                // คูลดาวน์ 2 วินาทีก่อนให้กดใหม่ได้
-                setTimeout(() => {
-                    voteBtn.textContent = 'ยืนยันการโหวต';
-                    voteBtn.disabled = false;
-                    location.reload()
-                }, 2000);
+                
+                setTimeout(() => location.reload(), 2000);
 
             } catch (err) {
-                console.error(err);
-                msg.textContent = "❌ โหวตไม่สำเร็จ กรุณาลองใหม่";
+                msg.textContent = "❌ เกิดข้อผิดพลาด กรุณาลองใหม่";
                 msg.className = "error";
-                voteBtn.disabled = false;
-                voteBtn.textContent = 'ยืนยันการโหวต';
+                btn.disabled = false;
+                btn.textContent = 'ยืนยันการโหวต';
             }
-        }
+        };
     </script>
 </body>
 </html>

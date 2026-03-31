@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Draw - ระบบสุ่มผู้โชคดี</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        .btn-draw {
+            background: linear-gradient(to bottom, #FFD700, #b8860b);
+            color: #004D1A; 
+            box-shadow: 0 8px 0 #8b6508, 0 15px 30px rgba(0,0,0,0.5);
+            text-shadow: 0 1px 2px rgba(255,255,255,0.3);
+        }
+        /* ปรับ Font Sarabun ให้คมชัดขึ้น */
+        body {   background-size: cover;
+                background-image: url('bg_football_lucky.jpg');
+                height: 100%; 
+                text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+    </style>
+</head>
+<body class="min-h-screen bg-cover bg-center">
+
+    <div class="relative w-full min-h-screen overflow-hidden">
+        
+        <div id="lucky-display-area" class="absolute right-[5%] top-[40%] w-[45%] text-center">
+            
+            <div class="text-4xl mb-2">🎊</div>
+            
+            <div id="display-name" class="text-6xl md:text-8xl font-black text-black drop-shadow-[0_5px_15px_rgba(0,0,0,0.8)] leading-tight uppercase whitespace-nowrap overflow-visible">
+                READY?
+            </div>
+            
+            <div id="display-phone" class="text-3xl mt-4 font-mono text-[#FFD700] opacity-0 transition-all duration-500 font-bold bg-black/50 py-2 px-8 rounded-full inline-block border border-yellow-500/30">
+                08X-XXX-XXXX
+            </div>
+
+            <p id="candidate-info" class="mt-4 text-sm font-bold text-white/60 drop-shadow-md">
+                รอเริ่มสุ่มเพื่อหาผู้โชคดี...
+            </p>
+        </div>
+
+        <div class="absolute right-[12%] bottom-[10%] w-[30%] flex flex-col items-center gap-4">
+            
+            <button id="draw-btn" onclick="startDraw()" class="btn-draw w-full py-5 rounded-2xl text-3xl font-black transition-all hover:scale-105 active:scale-95">
+                🎰 เริ่มสุ่มผู้โชคดี
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        let candidates = [];
+        let isSpinning = false;
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoMatchId = urlParams.get('matchId');
+        // แก้ไขส่วน <script> ใน lucky_draw.html
+
+        async function init() {
+            
+            // 2. ถ้ามี matchId ส่งมาจากหลังบ้าน ให้เช็ครายชื่อทันที
+            if (autoMatchId) {
+                checkCandidates();
+            }
+   
+        }
+
+        async function checkCandidates() {
+           
+            if (!autoMatchId) return;
+
+            // 1. หาผลการแข่งขันจริงของแมตช์นี้
+            const { data: match } = await _supabase.from('matches').select('home_score, away_score').eq('id', autoMatchId).single();
+            
+            let actualResult = 'draw';
+            if (match.home_score > match.away_score) actualResult = 'win';
+            else if (match.home_score < match.away_score) actualResult = 'loss';
+
+            // 2. ดึงคนที่ "ทายถูก" และ "ยังไม่ได้รางวัล"
+            const { data: list } = await _supabase.from('predictions')
+                .select('*')
+                .eq('match_id', autoMatchId)
+                .eq('predicted_result', actualResult) // เช็คเฉพาะคนที่ทายถูก
+                .eq('is_winner', false); // ต้องยังไม่ได้รางวัล
+
+            candidates = list || [];
+            document.getElementById('candidate-info').innerText = `มีผู้ทายถูกและมีสิทธิ์สุ่มทั้งหมด ${candidates.length} ท่าน`;
+        }
+
+        async function startDraw() {
+            if (isSpinning || candidates.length === 0) return alert("ไม่รายชื่อผู้มีสิทธิ์ในระบบ");
+            isSpinning = true;
+            document.getElementById('draw-btn').disabled = true;
+            document.getElementById('display-phone').classList.add('opacity-0');
+            
+            let duration = 3000; // สุ่ม 3 วินาที
+            let startTime = Date.now();
+
+            const spin = setInterval(() => {
+                const random = candidates[Math.floor(Math.random() * candidates.length)];
+                document.getElementById('display-name').innerText = random.user_name;
+                
+                if (Date.now() - startTime > duration) {
+                    clearInterval(spin);
+                    finalizeWinner(random, "");
+                }
+            }, 80);
+        }
+
+        async function finalizeWinner(winner, prize) {
+            // บันทึกลง DB ว่าคนนี้ได้รางวัลแล้ว
+            const { error } = await _supabase.from('predictions')
+                .update({ is_winner: true, prize_name: prize })
+                .eq('id', winner.id);
+
+            if (!error) {
+                // ถ้าชื่อยาวเกิน 20 ตัวอักษร ให้ลดขนาด Font ลง
+                const nameElement = document.getElementById('display-name');
+                if (winner.user_name.length > 10) {
+                    nameElement.style.fontSize = "3.5rem"; // ขนาดเล็กลง
+                } else {
+                    nameElement.style.fontSize = "6rem"; // ขนาดปกติ
+                }
+                document.getElementById('display-name').innerHTML = `🎊 ${winner.user_name} 🎊`;
+                document.getElementById('display-phone').innerText = winner.phone.replace(/(\d{3})(\d{3})(\d{4})/, '$1-XXX-$3');
+                document.getElementById('display-phone').classList.remove('opacity-0');
+                
+                // เอฟเฟกต์พลุ
+                confetti({
+                    particleCount: 150, spread: 70, origin: { y: 0.6 },
+                    colors: ['#FFD700', '#ffffff', '#004D1A']
+                });
+
+                await checkCandidates(); // อัปเดตรายชื่อผู้สิทธิ์ที่เหลือ
+                isSpinning = false;
+                document.getElementById('draw-btn').disabled = false;
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
