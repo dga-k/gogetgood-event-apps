@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทายผลฟุตบอล - เชียร์ช้างศึก</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #ffffff; margin: 0; }
+        .bg-gray-input { background-color: #E5E5E5; border-radius: 8px; }
+        .btn-thai { background-color: #004D1A; color: white; transition: all 0.2s; }
+        .btn-thai:disabled { background-color: #ccc; cursor: not-allowed; }
+        input::placeholder { color: #888; font-weight: normal; }
+        
+        /* สไตล์วิทยุ (Radio) */
+       /* สไตล์วิทยุ (Radio) - แก้ไขใหม่ให้กดง่ายขึ้น */
+        .radio-group { display: flex; justify-content: flex-start; gap: 20px; }
+        
+        .radio-item { position: relative; display: flex; align-items: center; cursor: pointer; }
+        .radio-item input { position: absolute; opacity: 0; cursor: pointer; }
+        
+        .custom-radio {
+            height: 22px; width: 22px; background-color: #fff;
+            border: 2px solid #004D1A; border-radius: 50%;
+            margin-right: 10px; display: inline-block; position: relative;
+        }
+
+        /* เมื่อถูกเลือก */
+        .radio-item input:checked ~ .custom-radio { background-color: #fff; }
+        .radio-item input:checked ~ .custom-radio::after {
+            content: ""; position: absolute; display: block;
+            left: 50%; top: 50%; width: 12px; height: 12px;
+            border-radius: 50%; background: #004D1A;
+            transform: translate(-50%, -50%);
+        }
+        
+        .radio-label-text { font-weight: bold; color: #333; font-size: 1.1rem; }
+    </style>
+</head>
+<body class="bg-white">
+
+    <div class="w-full relative min-h-[150px] bg-slate-100">
+        <img id="match-banner" src="ิbanner.jpg" class="w-full h-auto block opacity-0 transition-opacity duration-500" onload="this.classList.add('opacity-100')">
+    </div>
+
+    <div class="p-6 max-w-md mx-auto text-center">
+        
+        <h2 id="match-header" class="text-[#004D1A] text-lg font-bold leading-tight mb-8">
+            ร่วมสนุกทายผลการแข่งขันคู่ระหว่าง<br>
+            <span id="team-names" class="text-xl">กำลังโหลดข้อมูล...</span>
+        </h2>
+
+        <div id="form-container">
+            <div class="space-y-3 mb-6">
+                <input type="text" id="fname" placeholder="ชื่อ *" class="w-full p-4 bg-gray-input outline-none font-bold">
+                <input type="text" id="lname" placeholder="นามสกุล *" class="w-full p-4 bg-gray-input outline-none font-bold">
+                <input type="tel" id="phone" placeholder="เบอร์โทรศัพท์ *" class="w-full p-4 bg-gray-input outline-none font-bold">
+            </div>
+
+            <div class="text-left mb-8">
+                <h3 class="font-bold text-gray-800 mb-3 uppercase text-sm">ผลการแข่งขัน ทีมชาติไทย</h3>
+                <div class="radio-group">
+                    <label class="radio-item">
+                        <input type="radio" name="result" value="win" checked>
+                        <span class="custom-radio"></span>
+                        <span class="radio-label-text">ชนะ</span>
+                    </label>
+                    <label class="radio-item">
+                        <input type="radio" name="result" value="draw">
+                        <span class="custom-radio"></span>
+                        <span class="radio-label-text">เสมอ</span>
+                    </label>
+                    <label class="radio-item">
+                        <input type="radio" name="result" value="loss">
+                        <span class="custom-radio"></span>
+                        <span class="radio-label-text">แพ้</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div id="action-area">
+            <div class="h-14 bg-slate-50 animate-pulse rounded-lg"></div>
+        </div>
+
+        <p class="mt-6 text-[10px] text-gray-400">* กรุณากรอกข้อมูลให้ครบถ้วนเพื่อสิทธิ์ในการรับรางวัล</p>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const matchId = urlParams.get('matchId');
+
+        async function initPage() {
+            if (!matchId) {
+                document.getElementById('team-names').innerText = "❌ ไม่พบข้อมูลแมตช์";
+                document.getElementById('action-area').innerHTML = "";
+                return;
+            }
+
+            // ดึงข้อมูลแมตช์จาก Supabase
+            const { data: match, error } = await _supabase
+                .from('matches')
+                .select('*')
+                .eq('id', matchId)
+                .single();
+
+            if (error || !match) {
+                document.getElementById('team-names').innerText = "⚠️ ข้อมูลผิดพลาด";
+                return;
+            }
+
+            // 1. แสดงข้อมูลพื้นฐาน
+            document.getElementById('match-banner').src = match.banner_url || 'banner.jpg';
+            document.getElementById('team-names').innerText = `${match.team_home} พบกับ ${match.team_away}`;
+
+            // 2. เช็คสถานะการทายผล
+            const actionArea = document.getElementById('action-area');
+            const formContainer = document.getElementById('form-container');
+
+            if (match.status === 'locked') {
+                // สถานะ: ปิดรับทาย (บอลเตะอยู่)
+                formContainer.style.display = 'none'; 
+                actionArea.innerHTML = `
+                    <div class="bg-amber-50 border-2 border-amber-200 p-5 rounded-2xl">
+                        <p class="text-amber-600 font-black text-xl mb-1">🔒 ปิดรับการทายผลแล้ว</p>
+                        <p class="text-amber-500 text-xs">ขณะนี้การแข่งขันกำลังดำเนินอยู่ ขอให้โชคดี!</p>
+                    </div>
+                `;
+            } else if (match.status === 'finished') {
+                // สถานะ: จบเกมแล้ว
+                formContainer.style.display = 'none'; // ซ่อนฟอร์ม
+                actionArea.innerHTML = `
+                    <div class="bg-slate-100 border-2 border-slate-200 p-5 rounded-2xl">
+                        <p class="text-slate-500 font-black text-xl mb-1">🏁 จบการแข่งขันแล้ว</p>
+                        <p class="text-[#004D1A] font-bold text-lg italic">
+                            ผลการแข่งขัน: ${match.home_score} - ${match.away_score}
+                        </p>
+                    </div>
+                `;
+            } else {
+                // สถานะ: เปิดปกติ (pending)
+                actionArea.innerHTML = `
+                    <button onclick="submitPrediction()" class="w-full btn-thai py-4 rounded-lg font-black text-xl shadow-lg active:scale-95">
+                        ส่งผลการแข่งขัน
+                    </button>
+                `;
+            }
+        }
+
+        async function submitPrediction() {
+            // Re-check Status ป้องกันคนเปิดหน้าทิ้งไว้
+            const { data: checkMatch } = await _supabase.from('matches').select('status').eq('id', matchId).single();
+            if (checkMatch.status !== 'pending') {
+                alert("❌ ขออภัย! แมตช์นี้ปิดรับการทายผลไปเรียบร้อยแล้ว");
+                location.reload();
+                return;
+            }
+
+            const fname = document.getElementById('fname').value.trim();
+            const lname = document.getElementById('lname').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const result = document.querySelector('input[name="result"]:checked').value;
+
+            if (!fname || !lname || !phone) {
+                alert("กรุณากรอกข้อมูลให้ครบถ้วนก่อนส่งครับ");
+                return;
+            }
+
+            // บันทึกลง Supabase
+            const { error } = await _supabase.from('predictions').insert([{
+                match_id: matchId,
+                user_name: `${fname} ${lname}`,
+                phone: phone,
+                predicted_result: result
+            }]);
+
+            if (!error) {
+                alert("🎉 บันทึกการทายผลสำเร็จ! รอลุ้นรางวัลได้เลยครับ");
+                window.location.reload();
+            } else {
+                alert("เกิดข้อผิดพลาด: " + error.message);
+            }
+        }
+
+        initPage();
+    </script>
+</body>
+</html>

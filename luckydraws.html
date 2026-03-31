@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title></title>
+  <style>
+ h1 {
+  font-size: 800%;
+  margin: 5%
+}
+
+#target {
+  font-size: 300%;
+}
+.outer {
+  display: table;
+  width: 100%;
+  height: 100vh
+}
+.inner {
+  display: table-cell;
+  vertical-align: middle;
+}
+.well {
+  margin-top: 5%;
+  height: 90vh;
+  font-size: 200%;
+  overflow-y: scroll;
+}
+h2 {
+  font-size: 400%;
+}
+.list-group-item {
+  font-size :100%;
+}
+#luckyNumber {
+  font-size: 1500%;
+}
+#targetStop {
+	background: #ff0000;
+	display: none;
+}
+input {
+  width: 10%;
+}
+body {
+  font-family: 'Play', sans-serif;
+  background-size: cover;
+  background-image: url('bg_football_lucky.jpg');
+  height: 100%; 
+}
+.footer {
+   position: fixed;
+   left: 0;
+   bottom: 0;
+   width: 100%;
+   color: white;
+   text-align: center;
+}
+  </style>
+  <script src="https://code.jquery.com/jquery-3.5.0.js"></script>
+  <script src="https://use.fontawesome.com/18f2c49040.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Play" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/4.4.0/bootbox.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.4/js.cookie.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/10.16.6/sweetalert2.min.css" />
+</head>
+<body>
+	<div class="container-fluid">
+		<div class="row">
+      <div class="col-xs-12 col-sm-5">
+      </div>
+		  <div class="col-xs-12 col-sm-7">
+			<div class="outer">
+			  <div class="inner">
+				<div class="row">
+				  <div class="text-center col-xs-10 col-xs-offset-1 animated bounce">
+            
+          <h1 id="headerNames" style="font-size: 70px;color: rgb(39, 20, 211);margin-top: 5%;"></h1>
+          
+
+				  </div>
+          
+				</div>
+				  
+			</div>
+	  
+		  </div>
+		  
+		</div>
+	  </div>
+	  </div>
+    <div class="footer">
+      <button class="btn btn-block btn-primary text-center" id="targetDraw">Draw!</button>
+      <button class="btn btn-block btn-primary text-center" id="targetStop">Stop!</button>
+    </div>
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  let intervalHandle = null;
+  var namesList;
+// Add list of names here
+//userList1
+//$.getJSON("daikinList.json", function(json) {
+//    namesList = json;
+//   console.log(namesList); // this will show the info it in firebug console
+//});
+readData()
+
+const startButton = document.getElementById('targetDraw');
+const stopButton = document.getElementById('targetStop');
+startButton.addEventListener('click', function() {
+  this.style.display = "none";
+	stopButton.style.display = "block";
+
+ 
+	intervalHandle = setInterval(function () {headerNames.innerHTML = namesList[Math.floor(Math.random() * namesList.length)];}, 100); 
+});
+stopButton.addEventListener('click', function() {
+	this.style.display = "none";
+	startButton.style.display = "block";
+	console.log($("#headerNames").html(),"headerNames"); 
+	console.log($("#headerNames"),"headerNames"); 
+	const index = namesList.indexOf($("#headerNames").html());
+if (index > -1) { // only splice array when item is found
+	namesList.splice(index, 1); // 2nd parameter means remove one item only
+}
+
+console.log(namesList); 
+	
+	clearInterval(intervalHandle);
+	
+});
+function readData(){
+   
+        fetch("https://script.google.com/macros/s/AKfycbwibuNNGfHaWVHOabCa06D43N_3oO8Bsw3DZg853bM6M83IMW3-OSVSZnkHc3tvad96/exec", {
+         method: 'GET'
+         }).then(Swal.fire({
+                    position: "center",
+                    icon: "success",
+                    title: "Loading...",
+                    showConfirmButton: false,
+                    timer: 3000
+        })).then(response =>response.json()).then(data=>{
+            // Extract the todo data from the response
+            let todo = data.todo;
+            namesList = data.todo;
+            console.log("List:" + namesList);
+            Swal.fire({
+                    position: "center",
+                    icon: "success",
+                    title: namesList.length,
+                    showConfirmButton: true,
+                    timer: 1500
+        })
+            // Map each todo item to a string of table row HTML
+        }).catch(err => {
+            console.log("Error:" + err);
+        });
+        }
+</script>
+ 
+</body>
+</html>
