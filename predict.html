@@ -168,7 +168,12 @@
                 alert("กรุณากรอกข้อมูลให้ครบถ้วนก่อนส่งครับ");
                 return;
             }
-
+        // เช็คว่าเป็นตัวเลขล้วนและครบ 10 หลักหรือไม่
+            const phoneRegex = /^[0-9]{10}$/;
+            if (!phoneRegex.test(phone)) {
+                alert("❌ กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (ตัวเลข 10 หลัก)");
+                return;
+            }
             // บันทึกลง Supabase
             const { error } = await _supabase.from('predictions').insert([{
                 match_id: matchId,
@@ -179,7 +184,16 @@
 
             if (!error) {
                 alert("🎉 บันทึกการทายผลสำเร็จ! รอลุ้นรางวัลได้เลยครับ");
-                window.location.reload();
+                //window.location.reload();
+                const formContainer = document.getElementById('form-container');
+                const actionArea = document.getElementById('action-area');
+                formContainer.style.display = 'none'; 
+                actionArea.innerHTML = `
+                    <div class="bg-amber-50 border-2 border-amber-200 p-5 rounded-2xl">
+                        <p class="text-amber-600 font-black text-xl mb-1">✅ ส่งข้อมูลการทายผลแล้ว</p>
+                        <p class="text-amber-500 text-xs">ขอบคุณที่เข้าร่วมกิจกรรม</p>
+                    </div>
+                `;
             } else {
                 alert("เกิดข้อผิดพลาด: " + error.message);
             }
