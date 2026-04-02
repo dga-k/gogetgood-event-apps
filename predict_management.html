@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการข้อมูลการทายผล</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script> <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
+        .table-container { background: white; border-radius: 1rem; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-black text-slate-800">📊 รายการทายผลทั้งหมด</h1>
+                <p class="text-slate-500 font-bold">จำนวนผู้ทายผลทั้งหมด: <span id="total-count" class="text-indigo-600">0</span> รายการ</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="fetchPredictions()" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg transition-all">🔄 รีเฟรชข้อมูล</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase ml-2">กรองตามแมตช์</label>
+                <select id="filter-match" onchange="fetchPredictions()" class="w-full p-3 bg-slate-50 rounded-xl border-none outline-none font-bold text-slate-700 mt-1">
+                    <option value="">ทั้งหมดทุกแมตช์</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase ml-2">ค้นหาชื่อ/เบอร์โทร</label>
+                <input type="text" id="search-input" oninput="fetchPredictions()" placeholder="พิมพ์ชื่อหรือเบอร์โทร..." class="w-full p-3 bg-slate-50 rounded-xl border-none outline-none font-bold text-slate-700 mt-1">
+            </div>
+              <div>
+                <label class="text-xs font-bold text-slate-400 uppercase ml-2">ผลการแข่งขัน</label>
+                <select id="filter-result" onchange="fetchPredictions()" class="w-full p-3 bg-slate-50 rounded-xl border-none outline-none font-bold text-slate-700 mt-1">
+                    <option value="">ทั้งหมด</option>
+                    <option value="win">ชนะ</option>
+                    <option value="draw">เสมอ</option>
+                    <option value="loss">แพ้</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase ml-2">สถานะรางวัล</label>
+                <select id="filter-winner" onchange="fetchPredictions()" class="w-full p-3 bg-slate-50 rounded-xl border-none outline-none font-bold text-slate-700 mt-1">
+                    <option value="">ทั้งหมด</option>
+                    <option value="true">ได้รางวัลแล้ว</option>
+                    <option value="false">ยังไม่ได้รางวัล</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-container overflow-hidden border border-slate-100">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 text-slate-400 text-xs uppercase font-black">
+                    <tr>
+                        <th class="p-4">ผู้ทายผล / เบอร์โทร</th>
+                        <th class="p-4">แมตช์</th>
+                        <th class="p-4 text-center">ทายว่า</th>
+                        <th class="p-4 text-center">สถานะรางวัล</th>
+                        <th class="p-4 text-right">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="predict-list" class="divide-y divide-slate-50">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoMatchId = urlParams.get('matchId');
+        // โหลดข้อมูลครั้งแรก
+        async function init() {
+            await loadMatchesFilter();
+            await fetchPredictions();
+        }
+
+        // ดึงรายชื่อแมตช์มาใส่ในตัวกรอง
+        async function loadMatchesFilter() {
+            const { data } = await _supabase.from('matches').select('*').order('match_time', { ascending: false });
+            const select = document.getElementById('filter-match');
+            data?.forEach(m => {
+                select.innerHTML += `<option value="${m.id}">${m.team_home} vs ${m.team_away}</option>`;
+            });
+        }
+
+        // ดึงข้อมูลการทายผลพร้อม Filter
+        async function fetchPredictions() {
+            const matchId = document.getElementById('filter-match').value;
+            const searchText = document.getElementById('search-input').value;
+            const isWinner = document.getElementById('filter-winner').value;
+            const isResult = document.getElementById('filter-result').value;
+            let query = _supabase.from('predictions').select('*, matches(team_home, team_away)', { count: 'exact' });
+
+            if (matchId) query = query.eq('match_id', matchId);
+            if (isWinner !== "") query = query.eq('is_winner', isWinner);
+            if (isResult !== "") query = query.eq('predicted_result', isResult);
+            if (searchText) {
+                query = query.or(`user_name.ilike.%${searchText}%,phone.ilike.%${searchText}%`);
+            }
+
+            const { data, count, error } = await query.order('created_at', { ascending: false });
+
+            if (error) return console.error(error);
+
+            document.getElementById('total-count').innerText = count;
+            const list = document.getElementById('predict-list');
+            list.innerHTML = data.map(p => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="p-4">
+                        <div class="font-bold text-slate-700">${p.user_name}</div>
+                        <div class="text-xs text-slate-400 font-mono">${p.phone}</div>
+                    </td>
+                    <td class="p-4 text-sm font-bold text-slate-600">
+                        ${p.matches ? `${p.matches.team_home} vs ${p.matches.team_away}` : 'ไม่ระบุแมตช์'}
+                    </td>
+                    <td class="p-4 text-center text-sm">
+                        <span class="px-3 py-1 rounded-full font-black ${getResultColor(p.predicted_result)}">
+                            ${p.predicted_result.toUpperCase()}
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">
+                        ${p.is_winner ? 
+                            `<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-lg font-bold">🏆 ${p.prize_name || 'ได้รางวัล'}</span>` : 
+                            `<span class="text-xs bg-slate-100 text-slate-400 px-2 py-1 rounded-lg">รอลุ้น</span>`
+                        }
+                    </td>
+                    <td class="p-4 text-right space-x-2">
+                        <button onclick="deletePredict('${p.id}')" class="text-red-400 hover:text-red-600 font-bold text-xs uppercase">ลบ</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getResultColor(res) {
+            if (res === 'win') return 'bg-green-100 text-green-700';
+            if (res === 'loss') return 'bg-red-100 text-red-700';
+            return 'bg-blue-100 text-blue-700';
+        }
+
+        // ลบข้อมูล
+        async function deletePredict(id) {
+            if (!confirm('ยืนยันที่จะลบรายการทายผลนี้หรือไม่?')) return;
+            const { error } = await _supabase.from('predictions').delete().eq('id', id);
+            if (!error) fetchPredictions();
+        }
+
+        init();
+    </script>
+</body>
+</html>
