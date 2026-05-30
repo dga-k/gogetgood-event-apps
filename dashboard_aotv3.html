@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Hub - ระบบแอดมินและการจัดการกลาง</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased">
+
+  <div class="flex flex-col lg:flex-row min-h-screen">
+    
+    <aside class="w-full lg:w-64 bg-slate-950 p-6 space-y-6 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col justify-between">
+      <div class="space-y-6">
+        <div>
+          <div class="text-xl font-bold text-indigo-400 tracking-wide">Game Hub Admin</div>
+          <p class="text-[11px] text-slate-500 mt-1">ระบบจัดการและบันทึกผลหลังบ้าน</p>
+        </div>
+        
+        <nav class="space-y-1.5" id="sidebar-menu">
+          <button onclick="switchPage('dashboard')" id="menu-dashboard" class="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-indigo-600 text-white">
+            📊 แผงควบคุมหลัก (Queue)
+          </button>
+          <button onclick="switchPage('reports')" id="menu-reports" class="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-slate-200 transition-colors">
+            🌍 รายงานประเทศลูกค้า
+          </button>
+          <button onclick="switchPage('inventory')" id="menu-inventory" class="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-slate-200 transition-colors">
+            box คลังสระของรางวัล
+          </button>
+          
+          <div class="h-px bg-slate-800 my-4"></div>
+          
+          <a href="aotindex.html" target="_blank" class="w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-semibold text-indigo-400 bg-indigo-950/30 border border-indigo-900/40 hover:bg-indigo-950/60 transition-colors">
+            <span>📝 เปิดหน้าลงทะเบียนสลิป</span>
+            <span class="text-[10px] bg-indigo-900/80 px-1.5 py-0.5 rounded text-indigo-200">Staff ↗</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+        <p class="text-slate-500 font-semibold uppercase tracking-wider text-[9px]">สถานที่ปัจจุบัน</p>
+        <p class="text-slate-300 font-bold mt-0.5">🎯 AOT</p>
+      </div>
+    </aside>
+
+    <main class="flex-1 p-6 lg:p-8 max-w-7xl mx-auto w-full">
+      
+      <div id="page-dashboard" class="space-y-6">
+        <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+          <div>
+            <h1 class="text-xl font-bold text-slate-100">คิวลูกค้าและการแจกรางวัล</h1>
+            <p class="text-xs text-slate-400 mt-0.5">ดูรายชื่อลูกค้าที่เล่นเกมเสร็จแล้วกดปุ่มเพื่อบันทึกผลรางวัล</p>
+          </div>
+          <button onclick="initDashboard()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-xs font-medium rounded-lg border border-slate-700">🔄 รีเฟรช</button>
+        </header>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="bg-slate-800/40 p-4 rounded-xl border border-slate-800">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ยอดใบเสร็จสะสมรวม</p>
+            <p id="stat-total-amount" class="text-xl font-extrabold text-emerald-400 mt-1">฿0.00</p>
+          </div>
+          <div class="bg-slate-800/40 p-4 rounded-xl border border-slate-800">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">จำนวนสิทธิ์ลงทะเบียน</p>
+            <p id="stat-total-players" class="text-xl font-extrabold text-indigo-400 mt-1">0 คน</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/40">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="text-[10px] uppercase bg-slate-950 text-slate-400 border-b border-slate-800 tracking-wider">
+              <tr>
+                <th class="p-3.5">ชื่อลูกค้า / เวลา</th>
+                <th class="p-3.5">ยอดรวมเงิน</th>
+                <th class="p-3.5">สลิปใบเสร็จแยกตามร้าน</th>
+                <th class="p-3.5 text-right">การจัดการของรางวัล</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="page-reports" class="space-y-6 hidden">
+        <header class="border-b border-slate-800 pb-4">
+          <h1 class="text-xl font-bold text-slate-100">🌍 รายงานสถิติสัญชาติประเทศลูกค้า</h1>
+          <p class="text-xs text-slate-400 mt-0.5">สรุปสัดส่วนกลุ่มนักท่องเที่ยวและลูกค้าชาวต่างชาติที่ร่วมกิจกรรม</p>
+        </header>
+        
+        <div class="bg-slate-800/30 p-6 rounded-2xl border border-slate-800 max-w-xl">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">สัดส่วนผู้เข้าร่วมงานแยกตามประเทศ</h3>
+          <div id="nationality-chart-container" class="space-y-4">
+            </div>
+        </div>
+      </div>
+
+      <div id="page-inventory" class="space-y-6 hidden">
+        <header class="border-b border-slate-800 pb-4">
+          <h1 class="text-xl font-bold text-slate-100">📦 ระบบจัดการคลังสินค้าของรางวัล</h1>
+          <p class="text-xs text-slate-400 mt-0.5">ย้ายมาหน้านี้เพื่อความสะอาดของหน้าหลัก สามารถเพิ่มรายการและเติมสต็อกได้ที่นี่</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-slate-800/30 p-5 rounded-xl border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-slate-400 uppercase">รายการรางวัลทั้งหมดในระบบ</h3>
+            <div class="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead class="text-[10px] uppercase bg-slate-900 text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th class="p-3">ชื่อของรางวัล</th>
+                    <th class="p-3 text-center">คงเหลือปัจจุบัน</th>
+                  </tr>
+                </thead>
+                <tbody id="inventory-table-body" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="bg-slate-800/30 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+            <div class="space-y-3">
+              <h3 class="text-xs font-bold text-slate-400 uppercase">➕ เพิ่มหรือเติมของรางวัลใหม่</h3>
+              <div class="space-y-2 text-xs">
+                <label class="block text-slate-500">ชื่อของรางวัล</label>
+                <input type="text" id="new-reward-name" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg outline-none" placeholder="เช่น กระเป๋าผ้า">
+                <label class="block text-slate-500 mt-2">จำนวนสต็อกเริ่มต้น</label>
+                <input type="number" id="new-reward-stock" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg outline-none" placeholder="50">
+              </div>
+            </div>
+            <button id="btn-add-reward" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-xs transition-colors">บันทึกของรางวัล</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="reward-popup-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-800 w-full max-w-sm rounded-2xl border border-slate-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-850">
+        <div>
+          <h3 class="text-sm font-bold text-slate-200">🎁 เลือกรับของรางวัล</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">ระบุผลการเล่นเกมของ: <span id="modal-customer-name" class="text-indigo-400 font-bold"></span></p>
+        </div>
+        <button onclick="closeRewardModal()" class="text-slate-400 hover:text-slate-200 text-sm">✕</button>
+      </div>
+      
+      <div class="p-5 max-h-[300px] overflow-y-auto space-y-2" id="modal-reward-options">
+        </div>
+
+      <div class="p-4 bg-slate-900/50 border-t border-slate-700 flex gap-2 justify-end">
+        <button onclick="closeRewardModal()" class="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-xs hover:bg-slate-600">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+  
+
+    let cachedRewardsList = [];
+    let activeSessionIdForReward = null; // เก็บไอดีลูกค้าที่แอดมินกำลังจะกดสิทธิ์เลือกรางวัลในป๊อปอัป
+
+    // ฟังก์ชันในการสลับหน้าจอ (Single Page Application Logic)
+    function switchPage(pageName) {
+      // ซ่อนหน้าทั้งหมดก่อน
+      document.getElementById('page-dashboard').classList.add('hidden');
+      document.getElementById('page-reports').classList.add('hidden');
+      document.getElementById('page-inventory').classList.add('hidden');
+      
+      // เอาสีกดปุ่มเมนูเดิมออก
+      document.querySelectorAll('#sidebar-menu button').forEach(btn => {
+        btn.className = "w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-slate-200 transition-colors";
+      });
+
+      // แสดงเฉพาะหน้าที่เลือก และไฮไลต์เมนูให้ถูกต้อง
+      document.getElementById(`page-${pageName}`).classList.remove('hidden');
+      document.getElementById(`menu-${pageName}`).className = "w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-indigo-600 text-white";
+    }
+
+    async function initDashboard() {
+      const { data: rewards } = await _supabase.from('game_rewards').select('*').eq('is_active', true);
+      cachedRewardsList = rewards || [];
+
+      await loadStatsAndOverview();
+      await renderInventoryTable();
+      await renderMainQueueTable();
+    }
+
+    // 1. ประมวลผลตัวเลข และดึงข้อมูลทำกราฟสรุปประเภทสัญชาติ
+    async function loadStatsAndOverview() {
+      const { data: sessions } = await _supabase.from('customer_sessions').select('id, nationality, reward_id');
+      const { data: receipts } = await _supabase.from('receipt_items').select('amount');
+      
+      let totalAmount = 0;
+      let givenCount = 0;
+      let nationalityCounts = {};
+
+      if (receipts) receipts.forEach(item => totalAmount += parseFloat(item.amount || 0));
+      if (sessions) {
+        sessions.forEach(s => {
+          if (s.reward_id) givenCount++;
+          nationalityCounts[s.nationality] = (nationalityCounts[s.nationality] || 0) + 1;
+        });
+      }
+
+      document.getElementById('stat-total-amount').innerText = `฿${totalAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+      document.getElementById('stat-total-players').innerText = `${sessions ? sessions.length : 0} คน`;
+
+      // เรนเดอร์กราฟรายงานประเทศที่หน้าเมนูรายงาน
+      const chartContainer = document.getElementById('nationality-chart-container');
+      chartContainer.innerHTML = '';
+      const totalPlayers = sessions ? sessions.length : 0;
+
+      if(totalPlayers === 0) {
+        chartContainer.innerHTML = `<p class="text-xs text-slate-500 italic">ไม่มีข้อมูลสัญชาติ</p>`;
+        return;
+      }
+
+      Object.keys(nationalityCounts).forEach(country => {
+        const count = nationalityCounts[country];
+        const percentage = ((count / totalPlayers) * 100).toFixed(1);
+        const row = document.createElement('div');
+        row.className = "space-y-1";
+        row.innerHTML = `
+          <div class="flex justify-between text-[11px]"><span class="text-slate-300 font-medium">${country}</span><span class="text-slate-400">${count} คน (${percentage}%)</span></div>
+          <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden"><div class="bg-indigo-500 h-full rounded-full" style="width: ${percentage}%"></div></div>
+        `;
+        chartContainer.appendChild(row);
+      });
+    }
+
+    // 2. เรนเดอร์ตารางคลังสินค้าในเมนูสต็อกแยกเฉพาะ
+    async function renderInventoryTable() {
+      const tbody = document.getElementById('inventory-table-body');
+      tbody.innerHTML = '';
+      cachedRewardsList.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = "border-b border-slate-800";
+        tr.innerHTML = `
+          <td class="p-3 font-medium text-slate-200">${item.reward_name}</td>
+          <td class="p-3 text-center font-bold ${item.current_stock <= 0 ? 'text-rose-400' : 'text-amber-400'}">${item.current_stock} ชิ้น</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // บันทึกฟอร์มเพิ่มสต็อกสินค้า
+    document.getElementById('btn-add-reward').addEventListener('click', async () => {
+      const name = document.getElementById('new-reward-name').value.trim();
+      const stock = parseInt(document.getElementById('new-reward-stock').value);
+      if (!name || isNaN(stock)) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
+
+      await _supabase.from('game_rewards').insert([{ reward_name: name, total_stock: stock, current_stock: stock }]);
+      document.getElementById('new-reward-name').value = '';
+      document.getElementById('new-reward-stock').value = '';
+      initDashboard();
+    });
+
+    // 3. เรนเดอร์ตารางคิวหลักและจัดปุ่มสำหรับเปิดระบุป๊อปอัปเลือกรางวัล
+    async function renderMainQueueTable() {
+      const { data: logs } = await _supabase
+        .from('customer_sessions')
+        .select(`created_at, id, customer_name, nationality, reward_id, receipt_items(amount, shop_name, receipt_image_url)`)
+        .order('created_at', { ascending: false });
+
+      const tbody = document.getElementById('logs-table-body');
+      tbody.innerHTML = '';
+
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-500">ไม่พบรายชื่อผู้ร่วมสนุกในระบบ</td></tr>`;
+        return;
+      }
+
+      logs.forEach(session => {
+        const timeStr = new Date(session.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short', hour12: false });
+        
+        let totalSum = 0;
+        let receiptsHTML = '';
+        if (session.receipt_items) {
+          session.receipt_items.forEach(item => {
+            totalSum += parseFloat(item.amount || 0);
+            const link = item.receipt_image_url ? `<a href="${item.receipt_image_url}" target="_blank" class="text-indigo-400 underline ml-1">ดูรูป</a>` : '';
+            receiptsHTML += `<div class="text-[10px] text-slate-400">▪️ ${item.shop_name}: ฿${parseFloat(item.amount).toLocaleString()} ${link}</div>`;
+          });
+        }
+
+        // คอลัมน์จัดการรางวัล: ถ้ายังไม่ได้ของรางวัล จะขึ้นเป็นปุ่มกดเรียกเปิดตัว Pop-up ทันที
+        let actionHTML = '';
+        if (session.reward_id) {
+          const matched = cachedRewardsList.find(r => r.id === session.reward_id);
+          actionHTML = `<span class="text-emerald-400 font-bold bg-emerald-950/40 px-2 py-1 rounded border border-emerald-800/30">🎁 ได้รับ: ${matched ? matched.reward_name : 'รางวัล'}</span>`;
+        } else {
+          actionHTML = `<button onclick="openRewardModal('${session.id}', '${session.customer_name}')" class="px-3 py-1 bg-amber-500 text-slate-950 font-bold rounded shadow hover:bg-amber-400 transition-transform active:scale-95">🎁 มอบรางวัล</button>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/20 align-top";
+        tr.innerHTML = `
+          <td class="p-3.5">
+            <div class="font-bold text-slate-200">${session.customer_name} <span class="text-[10px] font-normal text-slate-500">(${session.nationality})</span></div>
+            <div class="text-[10px] text-slate-500 mt-0.5">${timeStr}</div>
+          </td>
+          <td class="p-3.5 font-extrabold text-emerald-400">฿${totalSum.toLocaleString('th-TH')}</td>
+          <td class="p-3.5 space-y-1">${receiptsHTML || '-'}</td>
+          <td class="p-3.5 text-right whitespace-nowrap">${actionHTML}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ================= LOGIC POP-UP MODAL MANAGEMENT =================
+
+    // ฟังก์ชันเปิดตัวหน้าต่าง Pop-up สั่งการแจกรางวัลเมื่อลูกค้าเล่นเสร็จ
+    function openRewardModal(sessionId, customerName) {
+      activeSessionIdForReward = sessionId;
+      document.getElementById('modal-customer-name').innerText = customerName;
+      
+      const container = document.getElementById('modal-reward-options');
+      container.innerHTML = '';
+
+      // ดึงของรางวัลที่มีสิทธิ์แจกมาสร้างเป็นชุดกล่องปุ่มกดให้กดทีเดียวบันทึกผลได้เลย
+      cachedRewardsList.forEach(reward => {
+        if (reward.current_stock > 0) {
+          const btn = document.createElement('button');
+          btn.className = "w-full text-left p-3 bg-slate-700/60 hover:bg-indigo-600 hover:text-white rounded-xl border border-slate-600 transition-colors flex justify-between items-center group";
+          btn.innerHTML = `
+            <span class="text-xs font-semibold">🎁 ${reward.reward_name}</span>
+            <span class="text-[10px] bg-slate-800 group-hover:bg-indigo-800 text-slate-400 group-hover:text-indigo-200 px-2 py-0.5 rounded-full">คลังเหลือ ${reward.current_stock}</span>
+          `;
+          // เมื่อคลิกปุ่มชิ้นใดชิ้นหนึ่งในป๊อปอัป จะทำการเรียกเซฟทันที
+          btn.onclick = () => submitRewardSelection(reward.id);
+          container.appendChild(btn);
+        }
+      });
+
+      if (container.children.length === 0) {
+        container.innerHTML = `<p class="text-xs text-rose-400 italic text-center py-4">⚠️ ของรางวัลในคลังหมดเกลี้ยงทุกรายการ กรุณาไปเพิ่มคลังสินค้า</p>`;
+      }
+
+      document.getElementById('reward-popup-modal').classList.remove('hidden');
+    }
+
+    function closeRewardModal() {
+      document.getElementById('reward-popup-modal').classList.add('hidden');
+      activeSessionIdForReward = null;
+    }
+
+    // ฟังก์ชันยิงเซฟข้อมูลเมื่อกดยืนยันเลือกรางวัลใน Pop-up
+    async function submitRewardSelection(rewardId) {
+      if(!activeSessionIdForReward || !rewardId) return;
+
+      // 1. ผูกความสัมพันธ์รางวัลเข้ารายชื่อลูกค้าคนนั้นๆ
+      const { error: updateErr } = await _supabase
+        .from('customer_sessions')
+        .update({ reward_id: rewardId, game_played_at: new Date().toISOString() })
+        .eq('id', activeSessionIdForReward);
+
+      if (updateErr) { alert('ผิดพลาด: ' + updateErr.message); return; }
+
+      // 2. ตัดยอดสต็อกจำนวนของรางวัลลง 1 ชิ้น
+      const { data: currentReward } = await _supabase.from('game_rewards').select('current_stock').eq('id', rewardId).single();
+      if (currentReward) {
+        await _supabase.from('game_rewards').update({ current_stock: currentReward.current_stock - 1 }).eq('id', rewardId);
+      }
+
+      closeRewardModal();
+      initDashboard(); // รีเฟรชยอดทั้งหมดขึ้นจอภาพ
+    }
+
+    document.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>

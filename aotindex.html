@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff - ลงทะเบียนและบันทึกใบเสร็จ (Customer Registration)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased font-sans min-h-screen">
+
+  <div class="max-w-4xl mx-auto p-4 md:p-6 min-h-screen flex flex-col justify-between">
+    
+    <!-- 📌 ส่วนหัวของหน้าจอ / Header -->
+    <header class="mb-5 flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
+      <div>
+        <h1 class="text-xl md:text-2xl font-black text-indigo-600 tracking-tight">จุดลงทะเบียนกิจกรรม <span class="text-slate-400 font-normal">/ Registration</span></h1>
+        <p class="text-xs md:text-sm text-slate-500 mt-0.5">บันทึกข้อมูลใบเสร็จเพื่อรับสิทธิ์เล่นเกม / Register receipts for game queue.</p>
+      </div>
+      <div class="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl text-center hidden sm:block">
+        <p class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">ระบบสตาฟ</p>
+        <p class="text-xs font-bold text-indigo-700">Staff Mode</p>
+      </div>
+    </header>
+
+    <!-- 📌 ฟอร์มหลักสลับเลย์เอาต์ตามอุปกรณ์ (Responsive Grid) -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-start mb-6">
+      
+      <!-- 📦 ฝั่งขวา/ตอนบน: ข้อมูลลูกค้า (Customer Profile) -> กินพื้นที่ 2/5 ช่องบนแท็บเล็ต -->
+      <div class="md:col-span-2 bg-white p-5 rounded-2xl shadow-xs border border-slate-100 space-y-4">
+        <div class="border-b border-slate-100 pb-2">
+          <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">1. ข้อมูลลูกค้า / Customer Profile</h2>
+        </div>
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-600">ชื่อ-นามสกุล <span class="text-slate-400 font-normal">/ Full Name</span></label>
+          <input type="text" id="cust-name" class="w-full mt-1.5 p-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100" placeholder="เช่น สมชาย ใจดี / John Doe">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600">เบอร์โทรศัพท์ <span class="text-slate-400 font-normal">/ Phone Number</span></label>
+          <input type="tel" id="cust-phone" class="w-full mt-1.5 p-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100" placeholder="08XXXXXXXX">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600">ประเทศ / สัญชาติ <span class="text-slate-400 font-normal">/ Nationality</span></label>
+          <select id="cust-nationality" class="w-full mt-1.5 p-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm outline-none transition-all focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 text-slate-700">
+            <option value="ไทย (Thai)">🇹🇭 ไทย (Thai)</option>
+            <option value="จีน (Chinese)">🇨🇳 จีน (Chinese)</option>
+            <option value="มาเลเซีย (Malaysian)">🇲🇾 มาเลเซีย (Malaysian)</option>
+            <option value="สิงคโปร์ (Singaporean)">🇸🇬 สิงคโปร์ (Singaporean)</option>
+            <option value="อื่นๆ (Other)">🌍 อื่นๆ (Other)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 📦 ฝั่งซ้าย/ตอนล่าง: จัดการใบเสร็จ (Receipts Area) -> กินพื้นที่ 3/5 ช่องบนแท็บเล็ต -->
+      <div class="md:col-span-3 bg-white p-5 rounded-2xl shadow-xs border border-slate-100 space-y-4 flex flex-col justify-between">
+        <div>
+          <div class="flex justify-between items-center border-b border-slate-100 pb-2 mb-3">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">2. รายการใบเสร็จ / Receipt Details</h2>
+            <div class="text-right">
+              <span class="text-xs font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-100/60 px-3 py-1 rounded-full">
+                ยอดรวม / Total: ฿<span id="ui-total-amount" class="text-sm">0</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- กล่องใส่สไลด์แถวใบเสร็จ -->
+          <div id="receipt-list" class="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+            
+            <!-- แถวเริ่มต้นใบเสร็จชิ้นแรก (Index 0) -->
+            <div class="receipt-item p-3.5 bg-slate-50/50 rounded-xl border border-slate-200/60 space-y-3 relative group transition-colors hover:bg-slate-50" data-index="0">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-medium text-slate-500">ชื่อร้านค้า / Shop Name</label>
+                  <input type="text" class="shop-name w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-400" placeholder="King Power, Starbucks">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-medium text-slate-500">ยอดเงิน (บาท) / Amount (THB)</label>
+                  <input type="number" class="receipt-amount w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-400 font-bold text-slate-700" placeholder="500" oninput="calculateTotal()">
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-medium text-slate-500 mb-1">อัปโหลดรูปใบเสร็จ / Upload Receipt Image</label>
+                <input type="file" accept="image/*" capture="environment" class="receipt-file text-xs w-full file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 file:cursor-pointer text-slate-400">
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <button type="button" onclick="addReceiptRow()" class="w-full mt-3 py-2.5 border-2 border-dashed border-slate-200 text-slate-500 text-xs font-bold rounded-xl hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/40 transition-all cursor-pointer">
+          + เพิ่มใบเสร็จอีกใบ / Add Another Receipt
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 📌 ปุ่มกดบันทึกส่งข้อมูลใบเสร็จใหญ่ท้ายหน้าจอ -->
+    <footer class="mt-2">
+      <button id="btn-save-all" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-sm shadow-md shadow-indigo-200 hover:bg-indigo-700 active:scale-[0.99] transition-transform cursor-pointer flex justify-center items-center gap-2">
+        <span>🚀 ส่งข้อมูลเข้าระบบคิวเล่นเกม / Submit to Game Queue</span>
+      </button>
+    </footer>
+
+  </div>
+
+  <!-- สคริปต์การทำงานประมวลผลหลังบ้าน -->
+  <script>
+    let receiptCount = 1;
+
+    // ฟังก์ชันในการเพิ่มกล่องอินพุตใบเสร็จย่อยแบบ Dynamic รองรับทั้งสัญชาติไทยและเทศ
+    function addReceiptRow() {
+      const container = document.getElementById('receipt-list');
+      const div = document.createElement('div');
+      div.className = "receipt-item p-3.5 bg-slate-50/50 rounded-xl border border-slate-200/60 space-y-3 relative group transition-colors hover:bg-slate-50 animate-in fade-in slide-in-from-bottom-2 duration-150";
+      div.innerHTML = `
+        <button type="button" onclick="this.parentElement.remove(); calculateTotal();" class="absolute right-2.5 top-2.5 text-rose-500 font-bold text-[10px] bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100 hover:bg-rose-500 hover:text-white transition-colors">
+          ลบ / Delete
+        </button>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-500">ชื่อร้านค้า / Shop Name</label>
+            <input type="text" class="shop-name w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-400" placeholder="Shop Name">
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-500">ยอดเงิน (บาท) / Amount (THB)</label>
+            <input type="number" class="receipt-amount w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-400 font-bold text-slate-700" placeholder="1000" oninput="calculateTotal()">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-slate-500 mb-1">อัปโหลดรูปใบเสร็จ / Upload Receipt Image</label>
+          <input type="file" accept="image/*" capture="environment" class="receipt-file text-xs w-full file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 file:cursor-pointer text-slate-400">
+        </div>
+      `;
+      container.appendChild(div);
+      
+      // ออโต้สกรอลล์ลงไปด้านล่างเพื่อให้สตาฟทำงานง่ายขึ้น
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // ฟังก์ชันคำนวณราคายอดสลิปรวมสะสมกลางจอพนักงาน
+    function calculateTotal() {
+      let total = 0;
+      document.querySelectorAll('.receipt-amount').forEach(input => { 
+        total += parseFloat(input.value || 0); 
+      });
+      document.getElementById('ui-total-amount').innerText = total.toLocaleString('th-TH');
+      return total;
+    }
+
+    // ฟังก์ชันหลักดักจับ Event บันทึกข้อมูลขึ้นบนคลังระบบริเริ่มเซสชันคิว
+    document.getElementById('btn-save-all').addEventListener('click', async () => {
+      const name = document.getElementById('cust-name').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      const nationality = document.getElementById('cust-nationality').value;
+      const receiptRows = document.querySelectorAll('.receipt-item');
+
+      if (!name || !phone || receiptRows.length === 0) {
+        alert('กรุณากรอกข้อมูลลูกค้าและเพิ่มใบเสร็จอย่างน้อย 1 ใบครับ \nPlease fill customer info and add at least 1 receipt.');
+        return;
+      }
+
+      // ปิดปุ่มกดชั่วคราวเพื่อป้องกันสตาฟกดยิงซ้ำซ้อนระหว่างรอบันทึกอัปโหลดรูปภาพ
+      const btnSave = document.getElementById('btn-save-all');
+      btnSave.disabled = true;
+      btnSave.innerText = "กำลังประมวลผล... / Processing...";
+      btnSave.className = "w-full bg-slate-400 text-slate-200 py-3.5 rounded-2xl font-bold text-sm cursor-not-allowed text-center";
+
+      try {
+        // 1. บันทึกประวัติเปิดกล่องสิทธิ์เซสชันหัวใจหลักลูกค้าคนดังกล่าว
+        const { data: session, error: sessionError } = await _supabase
+          .from('customer_sessions')
+          .insert([{ customer_name: name, phone_number: phone, nationality: nationality }])
+          .select().single();
+
+        if (sessionError) throw new Error(sessionError.message);
+
+        // 2. ลูปตรวจสอบดึงค่าอัปโหลดรูปภาพทีละใบสลิป
+        for (let row of receiptRows) {
+          const shopName = row.querySelector('.shop-name').value.trim() || 'ไม่ระบุชื่อร้าน / Unspecified Shop';
+          const amount = parseFloat(row.querySelector('.receipt-amount').value || 0);
+          const fileInput = row.querySelector('.receipt-file');
+          const file = fileInput.files[0];
+          let imageUrl = null;
+
+          if (file) {
+            const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${file.name.split('.').pop()}`;
+            const { data: uploadData } = await _supabase.storage.from('receipts').upload(fileName, file);
+            if (uploadData) {
+              imageUrl = _supabase.storage.from('receipts').getPublicUrl(fileName).data.publicUrl;
+            }
+          }
+
+          // ยิงเข้าตารางแถวเก็บข้อมูลส่วนย่อยรายการของแถมของแอดมิน
+          await _supabase.from('receipt_items').insert([{
+            session_id: session.id,
+            shop_name: shopName,
+            amount: amount,
+            receipt_image_url: imageUrl
+          }]);
+        }
+
+        alert('🎉 บันทึกข้อมูลลูกค้าเข้าคิวเล่นเกมสำเร็จ! \nSuccess! Registered to game queue.');
+        location.reload(); // รีเฟรชหน้าระบบล้างฟอร์มใหม่พร้อมสแตนด์บายคิวถัดไป
+
+      } catch (err) {
+        alert('เกิดข้อผิดพลาด / System Error: ' + err.message);
+        // คืนค่าสภาพปุ่มกดให้กลับมาทำงานปกติหากยิงข้อมูลไม่สำเร็จ
+        btnSave.disabled = false;
+        btnSave.innerText = "ส่งข้อมูลเข้าระบบกลางคิวเล่นเกม / Submit to Game Queue";
+        btnSave.className = "w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold text-sm shadow-md hover:bg-indigo-700 active:scale-[0.99] transition-transform cursor-pointer text-center";
+      }
+    });
+  </script>
+</body>
+</html>
