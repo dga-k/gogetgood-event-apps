@@ -138,14 +138,17 @@
         @media (max-width: 1024px) {
             body {
                 width: 100%;
-                min-height: 100svh;
+                min-height: var(--initial-viewport-height, 100svh);
                 display: block;
                 overflow: hidden;
             }
 
             .poster {
+                position: fixed;
+                top: 0;
+                left: 0;
                 width: 100vw;
-                height: 100svh;
+                height: var(--initial-viewport-height, 100svh);
                 aspect-ratio: auto;
                 box-shadow: none;
             }
@@ -158,6 +161,9 @@
             }
         }
     </style>
+    <script>
+        document.documentElement.style.setProperty('--initial-viewport-height', `${window.innerHeight}px`);
+    </script>
 </head>
 <body>
     <main class="poster" id="poster" aria-label="Routes World 2026 registration">
