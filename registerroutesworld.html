@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#063b9b">
+    <title>Routes World 2026 Registration</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="auth.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #063b9b;
+            color: #063b9b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-width: 320px;
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            background: #fff;
+        }
+
+        .poster {
+            position: relative;
+            width: min(100vw, 62.5vh);
+            aspect-ratio: 1125 / 1800;
+            overflow: hidden;
+            background: #8acdf7 url("Regis-02_0.jpg") center / 100% 100% no-repeat;
+            container-type: inline-size;
+            box-shadow: 0 18px 60px rgb(0 20 67 / 38%);
+        }
+
+        .registration-form {
+            position: absolute;
+            inset: 0;
+        }
+
+        .field {
+            position: absolute;
+            left: 20.25%;
+            width: 75%;
+            height: 6.35%;
+            padding: 0 2.2%;
+            border: 0;
+            border-radius: 999px;
+            outline: 0;
+            background: #fff;
+            color: #063b9b;
+            font: 700 clamp(16px, 3.7cqi, 42px)/1 Arial, Helvetica, sans-serif;
+            box-shadow: 0 0 0 0 rgb(0 66 174 / 0%);
+            transition: box-shadow 160ms ease;
+        }
+
+        .field:focus {
+            box-shadow: 0 0 0 0.55cqi #10a9ee, 0 0 20px rgb(0 101 224 / 35%);
+        }
+
+        .field::placeholder {
+            color: #0b3e99;
+            opacity: 1;
+        }
+
+        .field-name { top: 53.72%; }
+        .field-position { top: 61.04%; }
+        .field-company { top: 68.45%; }
+        .field-email { top: 75.83%; }
+
+        .submit-button {
+            position: absolute;
+            top: 85.15%;
+            left: 21.7%;
+            width: 56.6%;
+            height: 8.1%;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .submit-button:focus-visible {
+            outline: 0.7cqi solid #fff;
+            outline-offset: 0.5cqi;
+        }
+
+        .submit-button:disabled {
+            cursor: wait;
+        }
+
+        .status {
+            position: absolute;
+            right: 5%;
+            bottom: 1.5%;
+            left: 5%;
+            min-height: 3.5%;
+            margin: 0;
+            padding: 0.8% 2%;
+            border-radius: 999px;
+            background: rgb(255 255 255 / 94%);
+            color: #9f1239;
+            text-align: center;
+            font-size: 2.4cqi;
+            font-weight: 700;
+        }
+
+        .status:empty {
+            display: none;
+        }
+
+        .poster.is-success {
+            background-image: url("Regis-03_0.jpg");
+        }
+
+        .poster.is-success .registration-form,
+        .poster.is-success .status {
+            display: none;
+        }
+
+        @media (max-height: 520px) and (min-width: 700px) {
+            body {
+                display: block;
+            }
+
+            .poster {
+                width: min(100vw, 62.5vh);
+                margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                width: 100%;
+                min-height: 100svh;
+                display: block;
+                overflow: hidden;
+            }
+
+            .poster {
+                width: 100vw;
+                height: 100svh;
+                aspect-ratio: auto;
+                box-shadow: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="poster" id="poster" aria-label="Routes World 2026 registration">
+        <form class="registration-form" id="registration-form" novalidate>
+            <input class="field field-name" name="Name" type="text" placeholder="Name" aria-label="Name" autocomplete="name" required>
+            <input class="field field-position" name="Position" type="text" placeholder="Position" aria-label="Position" autocomplete="organization-title" required>
+            <input class="field field-company" name="Company" type="text" placeholder="Company" aria-label="Company" autocomplete="organization" required>
+            <input class="field field-email" name="E-mail" type="email" placeholder="E-mail" aria-label="E-mail" autocomplete="email" required>
+            <button class="submit-button" type="submit" aria-label="Next"></button>
+        </form>
+        <p class="status" id="status" role="alert" aria-live="polite"></p>
+    </main>
+
+    <script>
+        const registrationId = new URLSearchParams(window.location.search).get('id');
+        const form = document.getElementById('registration-form');
+        const poster = document.getElementById('poster');
+        const status = document.getElementById('status');
+        const submitButton = form.querySelector('button[type="submit"]');
+
+        function showSuccess() {
+            poster.classList.add('is-success');
+        }
+
+        if (!registrationId) {
+            status.textContent = 'Registration link is missing its project ID.';
+        } else if (localStorage.getItem(`reg_done_${registrationId}`)) {
+            showSuccess();
+        }
+
+        form.addEventListener('input', (event) => {
+            if (event.target instanceof HTMLInputElement) {
+                event.target.setCustomValidity('');
+            }
+        });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            status.textContent = '';
+
+            if (!registrationId) {
+                status.textContent = 'Registration link is missing its project ID.';
+                return;
+            }
+
+            form.querySelectorAll('input').forEach((input) => {
+                input.value = input.value.trim();
+                input.setCustomValidity('');
+
+                if (input.validity.valueMissing) {
+                    input.setCustomValidity('This field is required.');
+                } else if (input.type === 'email' && input.validity.typeMismatch) {
+                    input.setCustomValidity('Please enter a valid email address.');
+                }
+            });
+
+            if (!form.reportValidity()) {
+                return;
+            }
+
+            submitButton.disabled = true;
+            const submittedData = Object.fromEntries(new FormData(form).entries());
+
+            try {
+                const { error } = await _supabase.from('registration_submissions').insert([{
+                    registration_id: registrationId,
+                    submitted_data: submittedData
+                }]);
+
+                if (error) {
+                    throw error;
+                }
+
+                localStorage.setItem(`reg_done_${registrationId}`, 'true');
+                showSuccess();
+            } catch (error) {
+                status.textContent = `Unable to complete registration: ${error.message}`;
+                submitButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
