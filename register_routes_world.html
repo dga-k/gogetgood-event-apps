@@ -138,14 +138,14 @@
         @media (max-width: 1024px) {
             body {
                 width: 100%;
-                min-height: 100dvh;
+                min-height: 100svh;
                 display: block;
                 overflow: hidden;
             }
 
             .poster {
                 width: 100vw;
-                height: 100dvh;
+                height: 100svh;
                 aspect-ratio: auto;
                 box-shadow: none;
             }
@@ -188,6 +188,12 @@
             showSuccess();
         }
 
+        form.addEventListener('input', (event) => {
+            if (event.target instanceof HTMLInputElement) {
+                event.target.setCustomValidity('');
+            }
+        });
+
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             status.textContent = '';
@@ -199,6 +205,13 @@
 
             form.querySelectorAll('input').forEach((input) => {
                 input.value = input.value.trim();
+                input.setCustomValidity('');
+
+                if (input.validity.valueMissing) {
+                    input.setCustomValidity('This field is required.');
+                } else if (input.type === 'email' && input.validity.typeMismatch) {
+                    input.setCustomValidity('Please enter a valid email address.');
+                }
             });
 
             if (!form.reportValidity()) {
