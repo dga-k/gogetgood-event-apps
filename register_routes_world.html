@@ -54,7 +54,7 @@
             outline: 0;
             background: #fff;
             color: #063b9b;
-            font: 700 3.7cqi/1 Arial, Helvetica, sans-serif;
+            font: 700 clamp(16px, 3.7cqi, 42px)/1 Arial, Helvetica, sans-serif;
             box-shadow: 0 0 0 0 rgb(0 66 174 / 0%);
             transition: box-shadow 160ms ease;
         }
@@ -132,6 +132,22 @@
             .poster {
                 width: min(100vw, 62.5vh);
                 margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                width: 100%;
+                min-height: 100dvh;
+                display: block;
+                overflow: hidden;
+            }
+
+            .poster {
+                width: 100vw;
+                height: 100dvh;
+                aspect-ratio: auto;
+                box-shadow: none;
             }
         }
 
