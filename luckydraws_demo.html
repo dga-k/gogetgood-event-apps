@@ -28,23 +28,11 @@ h2 {
   z-index: 2;
   width: 90%;
   margin: 0;
-  color: rgb(233, 232, 241);
-  font-size: 70px;
+  color: #fff;
+  font-size: 116px;
   text-align: center;
   overflow-wrap: anywhere;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
-}
-#headerNames.winner {
-  animation: winner-reveal 700ms ease-out, winner-glow 1.4s ease-in-out 700ms infinite alternate;
-}
-@keyframes winner-reveal {
-  0% { opacity: 0; transform: scale(0.55) translateY(-24px); }
-  70% { opacity: 1; transform: scale(1.12) translateY(4px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-@keyframes winner-glow {
-  from { text-shadow: 0 0 10px #fff, 0 0 24px #ffd700, 0 0 42px #ff8c00; }
-  to { text-shadow: 0 0 18px #fff, 0 0 36px #ffd700, 0 0 60px #ff8c00; }
+  text-shadow: none;
 }
 .list-group-item {
   font-size :100%;
@@ -60,7 +48,7 @@ input {
   width: 10%;
 }
 @media (max-width: 600px) {
-  #headerNames { font-size: 42px; }
+  #headerNames { font-size: 64px; }
 }
 body {
   font-family: 'Play', sans-serif;
@@ -116,7 +104,6 @@ const startButton = document.getElementById('targetDraw');
 const stopButton = document.getElementById('targetStop');
 startButton.addEventListener('click', function() {
   if (!namesList || namesList.length === 0) return;
-  headerNames.classList.remove('winner');
   this.style.display = "none";
 	stopButton.style.display = "block";
 
@@ -136,7 +123,6 @@ if (index > -1) { // only splice array when item is found
 console.log(namesList); 
 	
 	clearInterval(intervalHandle);
-  headerNames.classList.add('winner');
 	
 });
 function readData(){
