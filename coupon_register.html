@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jackpot Night Market</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f5cf; color: #222; font-family: Tahoma, Arial, sans-serif; }
+    main { width: min(1280px, calc(100% - 32px)); margin: 12px auto 32px; }
+    .banner { height: clamp(170px, 25vw, 320px); border: 2px solid #d6d9cf; border-radius: 16px; display: grid; place-content: center; overflow: hidden; text-align: center; background: repeating-linear-gradient(90deg, transparent 0 14%, #a8ff5730 14.2% 14.8%, transparent 15% 28%), linear-gradient(135deg, #c8ff5c 0%, #285f18 26%, #092a28 52%, #17466b 76%, #aeffc1 100%); box-shadow: inset 0 -55px #071d2170; }
+    .banner span { color: #f7f257; font-family: Impact, 'Arial Narrow', sans-serif; font-size: clamp(28px, 5.2vw, 68px); font-weight: 900; line-height: 1; transform: rotate(-5deg); text-shadow: 3px 4px #294527; }
+    .banner strong { display: block; font-size: 1.65em; letter-spacing: .04em; }
+    .card { background: white; border: 2px solid #dadbd3; border-radius: 16px; margin-top: 24px; overflow: hidden; }
+    .intro { border-top: 20px solid #cccf42; }
+    h1 { font-family: Arial, Tahoma, sans-serif; font-size: clamp(30px, 4.8vw, 64px); font-weight: 600; margin: 0; padding: 28px 46px 52px; }
+    .required-note { border-top: 2px solid #ddd; padding: 26px 46px; margin: 0; color: #d9392c; font-size: clamp(16px, 2.1vw, 26px); }
+    .question { padding: 48px 46px 60px; }
+    label { display: block; font-size: clamp(20px, 2.3vw, 30px); margin-bottom: 60px; }
+    .required { color: #d9392c; }
+    input { display: block; width: min(590px, 100%); border: 0; border-bottom: 2px solid #ddd; border-radius: 0; background: transparent; padding: 10px 0; color: #222; font: inherit; font-size: clamp(20px, 2.2vw, 28px); }
+    input:focus { outline: none; border-color: #969b20; }
+    input[aria-invalid="true"] { border-color: #d9392c; }
+    .actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; }
+    button { font: inherit; font-size: 22px; cursor: pointer; border: 0; border-radius: 7px; padding: 17px 46px; }
+    button[type="submit"] { background: #a2a729; color: white; }
+    button:disabled { background: #d8d8b9; color: #858575; cursor: default; }
+    button[type="reset"] { background: transparent; color: #878a22; padding-right: 16px; }
+    button:focus-visible { outline: 3px solid #456b32; outline-offset: 4px; }
+    #status { margin: 22px 0 0; line-height: 1.7; color: #b52e25; }
+    #status.success { color: #386623; }
+    #status:empty { display: none; }
+    @media (max-width: 600px) { main { width: calc(100% - 24px); } h1 { padding: 26px 22px 32px; } .required-note { padding: 22px; } .question { padding: 30px 22px 38px; } label { margin-bottom: 34px; } button { font-size: 18px; padding: 14px 28px; } }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="auth.js"></script>
+  <script defer src="coupon_register.js"></script>
+</head>
+<body>
+  <main>
+    <div class="banner" role="img" aria-label="Night Market Jackpot"><span>NIGHT MARKET<strong>JACKPOT</strong></span></div>
+    <section class="card intro" aria-labelledby="title">
+      <h1 id="title">Jackpot Night Market</h1>
+      <p class="required-note">* ระบุว่าเป็นคำถามที่จำเป็น</p>
+    </section>
+    <form id="coupon-form">
+      <div class="card question">
+        <label for="coupon">กรอกรหัส 6 ตัว ในคูปอง <span class="required">*</span></label>
+        <input id="coupon" name="coupon" type="text" required minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6}" placeholder="คำตอบของคุณ" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="status" title="กรอกรหัสตัวอักษรภาษาอังกฤษหรือตัวเลข 6 ตัว">
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+      <div class="actions">
+        <button id="submit" type="submit" disabled>ส่ง</button>
+        <button id="reset" type="reset">ล้างแบบฟอร์ม</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>
