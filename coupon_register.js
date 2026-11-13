@@ -11,6 +11,11 @@ const clientReady = typeof _supabase !== 'undefined';
 let saving = false;
 let submitted = false;
 
+if (validEvent) {
+  document.getElementById('title').textContent = eventCode;
+  document.title = eventCode;
+}
+
 function showMessage(message, success = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle('success', success);
