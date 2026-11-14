@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coupon Admin — Excel เป็น JSON</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f5dc;color:#252b24;font:16px Tahoma,Arial,sans-serif}main{max-width:900px;margin:auto;padding:28px 18px}h1{font-size:28px}h2{font-size:21px;margin-top:0}section{background:white;border:1px solid #dedfce;border-radius:16px;padding:24px;margin:20px 0}label{display:block;margin:16px 0 8px}input,select,textarea,button{font:inherit;border:1px solid #cbcebb;border-radius:8px;padding:12px}input,select,textarea{width:100%}textarea{min-height:200px;font-family:monospace}button{cursor:pointer;background:#737e24;color:white}button:disabled{opacity:.5;cursor:default}a{color:#53671a;overflow-wrap:anywhere}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}.secondary{background:white;color:#53671a}p{line-height:1.7}.muted{color:#66705f;font-size:14px}#status{white-space:pre-wrap;line-height:1.7}[hidden]{display:none!important}
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="auth.js"></script>
+  <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script defer src="coupon_import.js"></script>
+  <script defer src="coupon_admin.js"></script>
+</head>
+<body><main>
+  <h1>Coupon Admin</h1>
+  <p>เลือก Excel → แปลงเป็น JSON → บันทึกแยกตาม event → ตรวจรหัสจากหน้าลงทะเบียน</p>
+  <div id="admin-panel">
+    <section><h2>1. เลือกงานและไฟล์ Excel</h2>
+      <label for="saved-events">JSON ที่บันทึกแล้ว</label><select id="saved-events"><option value="">เลือกงาน หรือระบุงานใหม่ด้านล่าง</option></select>
+      <label for="event">Event</label><input id="event" maxlength="120" placeholder="เช่น Jackpot Night Market">
+      <label for="excel">ไฟล์ Excel (.xlsx)</label><input id="excel" type="file" accept=".xlsx">
+      <p class="muted">อ่านทุกชีตและทุกคอลัมน์ ข้ามหัวตาราง เก็บรหัสเป็นข้อความเพื่อรักษาศูนย์นำหน้า รองรับ 6–7 ตัว</p>
+      <button id="read">อ่าน Excel เป็น JSON</button>
+    </section>
+    <section><h2>2. ตรวจสอบและเก็บ JSON</h2>
+      <p id="summary">ยังไม่มีข้อมูล</p>
+      <label for="json">ตัวอย่าง JSON (แสดง 20 รหัสแรก)</label><textarea id="json" readonly></textarea>
+      <div class="actions"><button id="save" disabled>บันทึก JSON ของงานนี้</button><button id="download" class="secondary" disabled>ดาวน์โหลด JSON ทั้งหมด</button></div>
+      <p class="muted">บันทึกหนึ่งชุดต่อ event หากบันทึกงานเดิมจะใช้ JSON ชุดใหม่แทนชุดเก่า ประวัติการลงทะเบียนยังอยู่</p>
+      <p id="register-link"></p>
+    </section>
+  </div>
+  <p id="status" role="status" aria-live="polite"></p>
+</main></body></html>

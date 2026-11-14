@@ -22,7 +22,7 @@ function showMessage(message, success = false) {
 }
 
 function updateButton() {
-  submitButton.disabled = saving || submitted || !validEvent || !clientReady || !/^[A-Za-z0-9]{6}$/.test(coupon.value.trim());
+  submitButton.disabled = saving || submitted || !validEvent || !clientReady || !/^[A-Za-z0-9]{6,7}$/.test(coupon.value.trim());
 }
 
 if (!validEvent) {
@@ -68,6 +68,9 @@ form.addEventListener('submit', async (e) => {
       if (error.code === '23505') {
         coupon.setAttribute('aria-invalid', 'true');
         showMessage('รหัสคูปองนี้ถูกลงทะเบียนในกิจกรรมนี้แล้ว');
+      } else if (error.message === 'COUPON_NOT_ALLOWED') {
+        coupon.setAttribute('aria-invalid', 'true');
+        showMessage('รหัสนี้ไม่ตรงกับรายการของงาน กรุณาตรวจสอบตัวเลขและลิงก์กิจกรรม');
       } else {
         showMessage('บันทึกไม่สำเร็จ กรุณาลองใหม่ หากยังพบปัญหาให้ติดต่อเจ้าหน้าที่');
       }

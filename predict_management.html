@@ -20,7 +20,8 @@
                 <h1 class="text-3xl font-black text-slate-800">📊 รายการทายผลทั้งหมด</h1>
                 <p class="text-slate-500 font-bold">จำนวนผู้ทายผลทั้งหมด: <span id="total-count" class="text-indigo-600">0</span> รายการ</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
+                <a href="admin_matches.html" class="bg-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-bold hover:bg-slate-300">← กลับหน้าแอดมิน</a>
                 <button onclick="fetchPredictions()" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg transition-all">🔄 รีเฟรชข้อมูล</button>
             </div>
         </div>
@@ -55,6 +56,15 @@
             </div>
         </div>
 
+        <div class="mb-6 bg-white p-6 rounded-3xl border border-slate-100">
+            <div class="flex flex-wrap gap-3">
+                <button onclick="bulkPredictions('reset')" class="bg-amber-100 text-amber-800 px-5 py-3 rounded-xl font-bold disabled:opacity-50">ยกเลิกการได้รางวัลทั้งหมด</button>
+                <button onclick="bulkPredictions('delete')" class="bg-red-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-red-700 disabled:opacity-50">ลบรายการทั้งหมด</button>
+            </div>
+            <p class="text-sm text-slate-500 mt-3">ทั้งสองปุ่มทำงานกับทุกรายการตามตัวกรองด้านบน รวมรายการที่ไม่ได้แสดงในตาราง หากไม่กรองจะมีผลกับทุกแมตช์</p>
+            <p id="bulk-status" class="text-sm font-bold text-slate-700 mt-2" role="status" aria-live="polite"></p>
+        </div>
+
         <div class="table-container overflow-hidden border border-slate-100">
             <table class="w-full text-left border-collapse">
                 <thead class="bg-slate-50 text-slate-400 text-xs uppercase font-black">
@@ -75,6 +85,7 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const autoMatchId = urlParams.get('matchId');
+        let bulkBusy = false;
         // โหลดข้อมูลครั้งแรก
         async function init() {
             await loadMatchesFilter();
@@ -88,22 +99,37 @@
             data?.forEach(m => {
                 select.innerHTML += `<option value="${m.id}">${m.team_home} vs ${m.team_away}</option>`;
             });
+            if (autoMatchId) {
+                if (!Array.from(select.options).some(option => option.value === autoMatchId)) {
+                    select.add(new Option('แมตช์จากลิงก์', autoMatchId));
+                }
+                select.value = autoMatchId;
+            }
         }
 
-        // ดึงข้อมูลการทายผลพร้อม Filter
-        async function fetchPredictions() {
-            const matchId = document.getElementById('filter-match').value;
-            const searchText = document.getElementById('search-input').value;
-            const isWinner = document.getElementById('filter-winner').value;
-            const isResult = document.getElementById('filter-result').value;
-            let query = _supabase.from('predictions').select('*, matches(team_home, team_away)', { count: 'exact' });
+        function readFilters() {
+            return {
+                matchId: document.getElementById('filter-match').value,
+                searchText: document.getElementById('search-input').value,
+                isWinner: document.getElementById('filter-winner').value,
+                isResult: document.getElementById('filter-result').value
+            };
+        }
 
-            if (matchId) query = query.eq('match_id', matchId);
-            if (isWinner !== "") query = query.eq('is_winner', isWinner);
-            if (isResult !== "") query = query.eq('predicted_result', isResult);
-            if (searchText) {
-                query = query.or(`user_name.ilike.%${searchText}%,phone.ilike.%${searchText}%`);
+        function applyFilters(query, filters) {
+            if (filters.matchId) query = query.eq('match_id', filters.matchId);
+            if (filters.isWinner !== '') query = query.eq('is_winner', filters.isWinner === 'true');
+            if (filters.isResult !== '') query = query.eq('predicted_result', filters.isResult);
+            if (filters.searchText) {
+                const text = filters.searchText.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                query = query.or(`user_name.ilike."%${text}%",phone.ilike."%${text}%"`);
             }
+            return query;
+        }
+
+        // ใช้ตัวกรองเดียวกันทั้งตารางและการจัดการทั้งหมด
+        async function fetchPredictions() {
+            const query = applyFilters(_supabase.from('predictions').select('*, matches(team_home, team_away)', { count: 'exact' }), readFilters());
 
             const { data, count, error } = await query.order('created_at', { ascending: false });
 
@@ -132,7 +158,8 @@
                         }
                     </td>
                     <td class="p-4 text-right space-x-2">
-                        <button onclick="deletePredict('${p.id}')" class="text-red-400 hover:text-red-600 font-bold text-xs uppercase">ลบ</button>
+                        ${p.is_winner ? `<button onclick="resetPrize('${p.id}', this)" class="text-amber-600 hover:text-amber-700 font-bold text-xs disabled:opacity-50">ยกเลิกการได้รางวัล</button>` : ''}
+                        <button onclick="deletePredict('${p.id}')" class="text-red-400 hover:text-red-600 font-bold text-xs uppercase">ลบรายการ</button>
                     </td>
                 </tr>
             `).join('');
@@ -144,8 +171,70 @@
             return 'bg-blue-100 text-blue-700';
         }
 
-        // ลบข้อมูล
+        async function bulkPredictions(action) {
+            if (bulkBusy || !['delete', 'reset'].includes(action)) return;
+            const filters = readFilters();
+            const status = document.getElementById('bulk-status');
+            const controls = Array.from(document.querySelectorAll('button, input, select'));
+            const previousDisabled = controls.map(control => control.disabled);
+            bulkBusy = true;
+            controls.forEach(control => { control.disabled = true; });
+            status.textContent = 'กำลังนับรายการตามตัวกรอง...';
+            try {
+                const scope = query => {
+                    query = applyFilters(query, filters).not('id', 'is', null);
+                    return action === 'reset' ? query.eq('is_winner', true) : query;
+                };
+                const { count, error: countError } = await scope(_supabase.from('predictions').select('id', { count: 'exact', head: true }));
+                if (countError) throw countError;
+                if (!count) { status.textContent = 'ไม่มีรายการที่ต้องดำเนินการตามตัวกรองนี้'; return; }
+                const matchSelect = document.getElementById('filter-match');
+                const matchLabel = filters.matchId ? matchSelect.selectedOptions[0].textContent : 'ทุกแมตช์';
+                const actionLabel = action === 'delete' ? 'ลบรายการทายผล' : 'ยกเลิกการได้รางวัล';
+                const details = [matchLabel];
+                if (filters.isResult) details.push(`ทายว่า: ${{ win: 'ชนะ', draw: 'เสมอ', loss: 'แพ้' }[filters.isResult]}`);
+                if (filters.isWinner !== '') details.push(filters.isWinner === 'true' ? 'ได้รางวัลแล้ว' : 'ยังไม่ได้รางวัล');
+                if (filters.searchText) details.push(`ค้นหา: ${filters.searchText}`);
+                const effect = action === 'delete' ? 'รายการทายผลจะถูกลบถาวร' : 'เก็บรายการทายผลไว้ และกลับมามีสิทธิ์จับรางวัลอีกครั้ง';
+                if (!confirm(`${actionLabel}ทั้งหมดตามตัวกรอง ${count.toLocaleString()} รายการ?\n${details.join(' · ')}\n${effect}`)) {
+                    status.textContent = 'ยกเลิกการดำเนินการแล้ว'; return;
+                }
+                status.textContent = 'กำลังดำเนินการ...';
+                const table = _supabase.from('predictions');
+                const mutation = action === 'delete' ? table.delete({ count: 'exact' }) : table.update({ is_winner: false, prize_name: null }, { count: 'exact' });
+                const { error, count: changed } = await scope(mutation);
+                if (error) throw error;
+                status.textContent = `${actionLabel}สำเร็จ${changed == null ? '' : ` ${changed.toLocaleString()} รายการ`}`;
+                await fetchPredictions();
+            } catch (error) {
+                status.textContent = 'ดำเนินการไม่สำเร็จ: ' + error.message;
+            } finally {
+                controls.forEach((control, index) => { control.disabled = previousDisabled[index]; });
+                bulkBusy = false;
+            }
+        }
+
+        // ล้างเฉพาะรางวัลของรายการนี้ โดยเก็บข้อมูลการทายผลไว้
+        async function resetPrize(id, button) {
+            if (bulkBusy) return;
+            if (!confirm('ยกเลิกการได้รางวัลของรายการนี้? ข้อมูลการทายผลจะยังอยู่และกลับมามีสิทธิ์จับรางวัลอีกครั้ง')) return;
+            button.disabled = true;
+            try {
+                const { error } = await _supabase.from('predictions')
+                    .update({ is_winner: false, prize_name: null })
+                    .eq('id', id);
+                if (error) throw error;
+                await fetchPredictions();
+            } catch (error) {
+                alert('ยกเลิกการได้รางวัลไม่สำเร็จ: ' + error.message);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        // ลบรายการทายผลออกจากฐานข้อมูล
         async function deletePredict(id) {
+            if (bulkBusy) return;
             if (!confirm('ยืนยันที่จะลบรายการทายผลนี้หรือไม่?')) return;
             const { error } = await _supabase.from('predictions').delete().eq('id', id);
             if (!error) fetchPredictions();

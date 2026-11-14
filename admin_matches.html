@@ -62,7 +62,32 @@
         </div>
     </div>
 
+    <dialog id="score-modal" aria-labelledby="score-title" class="rounded-[2rem] p-8 w-full max-w-lg shadow-2xl backdrop:bg-slate-900/60">
+        <form id="score-form" onsubmit="saveScore(event)" class="space-y-5">
+            <h2 id="score-title" class="text-2xl font-black text-slate-800">ใส่ผลการแข่งขัน</h2>
+            <input id="score-match-id" type="hidden">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="score-home" id="score-home-label" class="block font-bold text-slate-600 mb-2">ทีมเหย้า</label>
+                    <input id="score-home" type="number" min="0" max="2147483647" step="1" required class="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-2xl font-bold">
+                </div>
+                <div>
+                    <label for="score-away" id="score-away-label" class="block font-bold text-slate-600 mb-2">ทีมเยือน</label>
+                    <input id="score-away" type="number" min="0" max="2147483647" step="1" required class="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-2xl font-bold">
+                </div>
+            </div>
+            <p class="text-sm text-slate-500">เมื่อบันทึก แมตช์นี้จะเปลี่ยนสถานะเป็นจบเกม</p>
+            <p id="score-error" role="alert" class="text-sm text-red-600"></p>
+            <div class="flex gap-3">
+                <button id="score-cancel" type="button" onclick="closeScoreModal()" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl disabled:opacity-50">ยกเลิก</button>
+                <button id="score-save" type="submit" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl disabled:opacity-50">บันทึกผล</button>
+            </div>
+        </form>
+    </dialog>
+
     <script>
+        let matchRows = [];
+        let savingScore = false;
         async function fetchMatches() {
             const { data: matches, error } = await _supabase
                 .from('matches')
@@ -70,6 +95,11 @@
                 .order('match_time', { ascending: false });
 
             const container = document.getElementById('match-list');
+            if (error || !matches) {
+                container.textContent = 'โหลดข้อมูลการแข่งขันไม่สำเร็จ กรุณารีเฟรชหน้า';
+                return;
+            }
+            matchRows = matches;
             if (matches.length === 0) {
                 container.innerHTML = `<p class="text-center py-10 text-slate-400">ยังไม่มีการแข่งขัน</p>`;
                 return;
@@ -94,7 +124,7 @@
                         </div>
                     </div>
                     
-                    <div class="flex gap-2 w-full md:w-auto">
+                    <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
                         ${!isFinished ? `
                             <button onclick="toggleLock('${m.id}', '${m.status}')" class="flex-1 md:flex-none px-4 py-2 ${isLocked ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'} rounded-xl text-xs font-bold transition-colors">
                                 ${isLocked ? '🔓 เปิดทาย' : '🔒 ปิดทาย'}
@@ -105,8 +135,19 @@
                                 🔗 ลิงก์ทายผล
                             </button>
                             <button onclick="finishGame('${m.id}')" class="flex-1 md:flex-none px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold">🏁 ใส่ผล</button>
-                        ` : `<div class="text-right px-4"><p class="text-[10px] font-bold text-slate-400">ผลคะแนน</p><p class="font-black text-indigo-600">${m.home_score} - ${m.away_score}</p></div>`}
+                        ` : `<div class="text-right px-4"><p class="text-[10px] font-bold text-slate-400">ผลคะแนน</p><p class="font-black text-indigo-600">${m.home_score} - ${m.away_score}</p></div>
+                            <button onclick="finishGame('${m.id}')" class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold">✏️ แก้ไขผล</button>
+                            <button onclick="reopenVoting('${m.id}', this)" class="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold disabled:opacity-50">🔓 เปิดโหวตใหม่</button>`}
                         ${isFinished ? `
+                            <label class="flex flex-col gap-1 text-xs font-bold text-slate-500">
+                                กลุ่มที่จับรางวัล
+                                <select id="draw-result-${m.id}" class="px-3 py-2 bg-slate-50 text-slate-800 rounded-xl border border-slate-200">
+                                    <option value="all">ทั้งหมด</option>
+                                    <option value="win">ชนะ (ทีมเหย้า)</option>
+                                    <option value="draw">เสมอ</option>
+                                    <option value="loss">แพ้ (ทีมเหย้า)</option>
+                                </select>
+                            </label>
                             <button onclick="openLuckyDraw('${m.id}')" 
                                     class="px-4 py-2 bg-yellow-400 text-black rounded-xl text-xs font-black shadow-sm hover:bg-yellow-300">
                                 🏆 จับรางวัล
@@ -121,6 +162,24 @@
         }
 
         // ฟังก์ชันปิด/เปิด การทายผล
+        async function reopenVoting(id, button) {
+            if (button.disabled) return;
+            if (!confirm('เปิดโหวตแมตช์นี้ใหม่? คะแนนเดิม รายการทายผล และสถานะรางวัลจะยังอยู่')) return;
+            button.disabled = true;
+            try {
+                const { error } = await _supabase.from('matches')
+                    .update({ status: 'pending' })
+                    .eq('id', id)
+                    .eq('status', 'finished');
+                if (error) throw error;
+                await fetchMatches();
+            } catch (error) {
+                alert('เปิดโหวตใหม่ไม่สำเร็จ: ' + error.message);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
         async function toggleLock(id, currentStatus) {
             const newStatus = currentStatus === 'pending' ? 'locked' : 'pending';
             await _supabase.from('matches').update({ status: newStatus }).eq('id', id);
@@ -128,16 +187,55 @@
         }
 
         // ฟังก์ชันบันทึกผลการแข่ง
-        async function finishGame(id) {
-            const h = prompt("คะแนนทีมเหย้า:");
-            const a = prompt("คะแนนทีมเยือน:");
-            if(h !== null && a !== null) {
-                await _supabase.from('matches').update({ 
-                    home_score: parseInt(h), 
-                    away_score: parseInt(a),
-                    status: 'finished' 
-                }).eq('id', id);
-                fetchMatches();
+        function finishGame(id) {
+            if (savingScore) return;
+            const match = matchRows.find(row => row.id === id);
+            if (!match) return;
+            document.getElementById('score-title').textContent = match.status === 'finished' ? 'แก้ไขผลการแข่งขัน' : 'ใส่ผลการแข่งขัน';
+            document.getElementById('score-match-id').value = id;
+            document.getElementById('score-home-label').textContent = `ทีมเหย้า: ${match.team_home}`;
+            document.getElementById('score-away-label').textContent = `ทีมเยือน: ${match.team_away}`;
+            document.getElementById('score-home').value = match.home_score ?? '';
+            document.getElementById('score-away').value = match.away_score ?? '';
+            document.getElementById('score-error').textContent = '';
+            document.getElementById('score-modal').showModal();
+            document.getElementById('score-home').focus();
+        }
+
+        function closeScoreModal() {
+            if (!savingScore) document.getElementById('score-modal').close();
+        }
+
+        document.getElementById('score-modal').addEventListener('cancel', event => {
+            if (savingScore) event.preventDefault();
+        });
+
+        async function saveScore(event) {
+            event.preventDefault();
+            if (savingScore || !document.getElementById('score-form').reportValidity()) return;
+            const homeInput = document.getElementById('score-home');
+            const awayInput = document.getElementById('score-away');
+            const home = Number(homeInput.value);
+            const away = Number(awayInput.value);
+            if (!homeInput.value.trim() || !awayInput.value.trim() ||
+                ![home, away].every(score => Number.isInteger(score) && score >= 0 && score <= 2147483647)) return;
+            const id = document.getElementById('score-match-id').value;
+            if (!id) return;
+            savingScore = true;
+            for (const name of ['score-save', 'score-cancel', 'score-home', 'score-away']) document.getElementById(name).disabled = true;
+            document.getElementById('score-save').textContent = 'กำลังบันทึก...';
+            document.getElementById('score-error').textContent = '';
+            try {
+                const { error } = await _supabase.from('matches').update({ home_score: home, away_score: away, status: 'finished' }).eq('id', id);
+                if (error) throw error;
+                document.getElementById('score-modal').close();
+                await fetchMatches();
+            } catch (error) {
+                document.getElementById('score-error').textContent = 'บันทึกผลไม่สำเร็จ: ' + error.message;
+            } finally {
+                savingScore = false;
+                for (const name of ['score-save', 'score-cancel', 'score-home', 'score-away']) document.getElementById(name).disabled = false;
+                document.getElementById('score-save').textContent = 'บันทึกผล';
             }
         }
 
@@ -172,8 +270,9 @@
         }
         // เพิ่มฟังก์ชันสำหรับเปิดหน้าจับรางวัล
         function openLuckyDraw(matchId) {
-            // ส่ง matchId ไปทาง URL เพื่อให้หน้าสุ่มรู้ว่าจะสุ่มของคู่ไหน
-            window.open(`luckydraw_matches.html?matchId=${matchId}`, '_blank');
+            const result = document.getElementById(`draw-result-${matchId}`).value;
+            const params = new URLSearchParams({ matchId, result });
+            window.open(`luckydraw_matches.html?${params}`, '_blank');
         }
          function openPredict(matchId) {
             // ส่ง matchId ไปทาง URL เพื่อให้หน้าสุ่มรู้ว่าจะสุ่มของคู่ไหน
