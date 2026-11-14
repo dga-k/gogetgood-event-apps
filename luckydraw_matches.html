@@ -11,7 +11,7 @@
     <style>
         body { 
             font-family: 'Sarabun', sans-serif; 
-            background-image: url('bg_football_lucky.jpg');
+            background-image: url('bg_football_lucky.png');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -73,6 +73,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const autoMatchId = urlParams.get('matchId');
         const prizesRaw = urlParams.get('prizes');
+        const selectedResult = urlParams.get('result');
 
         async function init() {
             
@@ -87,21 +88,33 @@
         async function checkCandidates() {
             if (!autoMatchId) return;
 
-            const { data: match } = await _supabase.from('matches').select('home_score, away_score').eq('id', autoMatchId).single();
-            if (!match) return;
+            let result = selectedResult;
+            if (!['all', 'win', 'draw', 'loss'].includes(result)) {
+                // Keep existing links without a filter drawing from correct predictions.
+                const { data: match, error } = await _supabase.from('matches').select('home_score, away_score').eq('id', autoMatchId).single();
+                if (error || !match) {
+                    candidates = [];
+                    alert('โหลดข้อมูลการแข่งขันไม่สำเร็จ กรุณาลองใหม่');
+                    return;
+                }
+                result = match.home_score > match.away_score ? 'win' : match.home_score < match.away_score ? 'loss' : 'draw';
+            }
 
-            let actualResult = 'draw';
-            if (match.home_score > match.away_score) actualResult = 'win';
-            else if (match.home_score < match.away_score) actualResult = 'loss';
-
-            const { data: list } = await _supabase.from('predictions')
+            let query = _supabase.from('predictions')
                 .select('*')
                 .eq('match_id', autoMatchId)
-                .eq('predicted_result', actualResult)
                 .eq('is_winner', false);
+            if (result !== 'all') query = query.eq('predicted_result', result);
+            const { data: list, error } = await query;
+            if (error) {
+                candidates = [];
+                alert('โหลดรายชื่อผู้มีสิทธิ์ไม่สำเร็จ กรุณาลองใหม่');
+                return;
+            }
 
             candidates = list || [];
-            document.getElementById('candidate-info').innerText = `ผู้ทายถูกและมีสิทธิ์สุ่มทั้งหมด ${candidates.length} ท่าน`;
+            const labels = { all: 'ทั้งหมด', win: 'ชนะ (ทีมเหย้า)', draw: 'เสมอ', loss: 'แพ้ (ทีมเหย้า)' };
+            document.getElementById('candidate-info').innerText = `กลุ่ม ${labels[result]} · ผู้มีสิทธิ์สุ่ม ${candidates.length} ท่าน`;
         }
 
         // ฟังก์ชันสลับ เริ่ม/หยุด
