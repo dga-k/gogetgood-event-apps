@@ -81,7 +81,23 @@
 
             // 2. โหลดรายชื่อผู้มีสิทธิ์
             if (autoMatchId) {
-                await checkCandidates();
+                await Promise.all([loadDrawBackground(), checkCandidates()]);
+            }
+        }
+
+        async function loadDrawBackground() {
+            if (!autoMatchId) return;
+            try {
+                const { data, error } = await _supabase.from('matches').select('draw_background_url').eq('id', autoMatchId).single();
+                if (error) throw error;
+                if (!data?.draw_background_url) return;
+                const url = new URL(data.draw_background_url, window.location.href);
+                if (!['https:', 'http:'].includes(url.protocol)) return;
+                const image = new Image();
+                image.onload = () => { document.body.style.backgroundImage = `url(${JSON.stringify(url.href)})`; };
+                image.src = url.href;
+            } catch (error) {
+                console.error('โหลดพื้นหลังไม่สำเร็จ ใช้ภาพเริ่มต้น', error);
             }
         }
 
