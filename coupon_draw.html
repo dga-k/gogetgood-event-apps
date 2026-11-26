@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ประกาศผลผู้โชคดี</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="auth.js"></script>
+  <style>
+    :root{color-scheme:dark;--ink:#fffde8;--muted:#e4edcf;--lime:#edff35;--line:#b8ff3955;--panel:#05210dcc;--green:#164329}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:#061711;color:var(--ink);font-family:'Kanit',sans-serif;background-image:url('Jackpot-Motor.png');background-size:cover;background-position:center top;background-attachment:fixed;overflow-x:hidden}
+    main{width:min(1000px,94vw);min-height:100vh;margin:0 auto;padding:25vh 0 16vh;display:flex;flex-direction:column;justify-content:center;gap:8px}
+    button:focus-visible{outline:3px solid var(--lime);outline-offset:3px}
+    .stage{min-height:0;padding:16px 30px 12px;display:grid;grid-template-rows:auto auto auto;justify-items:center;align-items:center;text-align:center;background:transparent;border:0;overflow:visible}
+    .stage-caption{min-height:22px;color:var(--muted);font-size:15px;text-shadow:0 2px 6px #001b08}
+    .reels{width:min(500px,100%);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:12px 0 10px}
+    .reel{height:74px;display:grid;place-items:center;border:1px solid #edffb7;border-radius:7px;background:linear-gradient(180deg,#ffffed 0%,#e0eac8 50%,#fbffe9 100%);color:#102b17;font:600 46px 'Kanit',sans-serif;box-shadow:0 0 16px #baff5570,inset 0 0 14px #456c3344;text-shadow:0 1px #fff}
+    .reel.rolling{color:#304a32;filter:blur(.5px)}
+    .winner-panel{min-height:64px;display:grid;align-content:center;gap:2px}
+    .winner-label{color:#efffc7;font-size:14px;text-shadow:0 2px 6px #001b08}
+    #winner-name{font-size:32px;line-height:1.2;font-weight:700;overflow-wrap:anywhere;max-width:100%;color:#fffde8;text-shadow:0 2px 8px #001b08,0 0 18px #b7ff3a8c}
+    #winner-name.announced{animation:reveal .55s ease-out;color:var(--lime)}
+    @keyframes reveal{0%{transform:scale(.88);opacity:.35}70%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
+    .draw-actions{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;margin-top:12px}
+    button{min-width:170px;min-height:50px;border:1px solid #eaff9b;border-radius:7px;padding:10px 24px;background:linear-gradient(180deg,#f3ff70,#b6d900);color:#14270a;font:700 19px 'Kanit',sans-serif;cursor:pointer;box-shadow:0 4px 0 #518914,0 0 20px #baff4c52;transition:filter .16s,transform .16s}
+    button:hover:not(:disabled){filter:brightness(1.12);transform:translateY(-2px)}
+    #stop-button{background:linear-gradient(180deg,#f6fff1,#b7ef96);border-color:#d8ffc2;color:#123216;box-shadow:0 4px 0 #438938,0 0 20px #7dff6652}
+    button:disabled{background:#73836b;border-color:#9aa68e;color:#d4deca;box-shadow:none;cursor:not-allowed}
+    #status{min-height:22px;margin:2px 0 0;color:#f5ffc2;font-size:14px;text-align:center;text-shadow:0 2px 6px #001b08}
+    @media(max-width:640px){body{background-size:auto 100svh;background-position:center top;background-attachment:scroll}main{width:92vw;min-height:100svh;padding:25vh 0 18vh;gap:6px}.stage{padding:10px 4px}.stage-caption{font-size:13px}.reels{gap:5px;margin:10px 0 8px}.reel{height:58px;font-size:34px}.winner-panel{min-height:58px}#winner-name{font-size:25px}.draw-actions{gap:8px;margin-top:8px}button{min-width:0;min-height:46px;flex:1;padding:8px 12px;font-size:17px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="stage" aria-label="เครื่องสุ่มเลขคูปอง 6 หลัก">
+      <div class="stage-caption" id="stage-caption"></div>
+      <div class="reels" id="reels" aria-label="เลขคูปองที่กำลังสุ่ม">
+        <div class="reel" aria-hidden="true">0</div><div class="reel" aria-hidden="true">0</div><div class="reel" aria-hidden="true">0</div><div class="reel" aria-hidden="true">0</div><div class="reel" aria-hidden="true">0</div><div class="reel" aria-hidden="true">0</div>
+      </div>
+      <div class="winner-panel"><span class="winner-label">ชื่อผู้ถือรหัส</span><div id="winner-name" aria-live="polite">พร้อมสุ่ม</div></div>
+      <div class="draw-actions">
+        <button id="spin-button" type="button" disabled>SPIN</button>
+        <button id="stop-button" type="button" disabled>STOP</button>
+      </div>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    'use strict';
+    const drawEvent = (new URLSearchParams(location.search).get('event') || '').trim();
+    const spinButton = document.getElementById('spin-button');
+    const stopButton = document.getElementById('stop-button');
+    const reels = Array.from(document.querySelectorAll('#reels .reel'));
+    const nameDisplay = document.getElementById('winner-name');
+    const status = document.getElementById('status');
+    const stageCaption = document.getElementById('stage-caption');
+    let nameField = '';
+    let isSpinning = false;
+    let isStopping = false;
+    let drawReady = false;
+    let hasCandidates = false;
+    let animationFrame = 0;
+    let lastRollAt = 0;
+
+    function say(message) { status.textContent = message; }
+    function updateControls() {
+      spinButton.disabled = !drawEvent || !nameField || !drawReady || !hasCandidates || isSpinning || isStopping;
+      stopButton.disabled = !isSpinning || isStopping;
+    }
+    function findNameField(fields) {
+      const usable = fields.filter(field => typeof field.label === 'string' && field.label.trim());
+      const field = usable.find(item => /ชื่อ\s*[-–]?\s*นามสกุล|full\s*name/i.test(item.label))
+        || usable.find(item => /^(ชื่อ|name)$/i.test(item.label.trim()))
+        || usable.find(item => /ชื่อ|name/i.test(item.label));
+      return field ? field.label : '';
+    }
+    function resetReels(value = '0') {
+      reels.forEach(reel => { reel.textContent = value; reel.classList.remove('rolling'); });
+    }
+    async function loadEventConfig() {
+      if (typeof _supabase === 'undefined') throw new Error('เชื่อมต่อ Supabase ไม่สำเร็จ');
+      if (!drawEvent) throw new Error('ลิงก์นี้ไม่มี event');
+      const {data,error} = await _supabase.from('coupon_event_json').select('event,form_fields').eq('event',drawEvent).single();
+      if (error) throw error;
+      stageCaption.textContent = data.event;
+      nameField = findNameField(Array.isArray(data.form_fields) ? data.form_fields : []);
+      if (!nameField) throw new Error('งานนี้ยังไม่มีฟิลด์ชื่อ กรุณาตั้งค่าใน Coupon Admin');
+      const {data:remaining,error:remainingError} = await _supabase.rpc('coupon_draw_remaining',{p_event:drawEvent,p_field:nameField});
+      if (remainingError) throw remainingError;
+      drawReady = true;
+      hasCandidates = Number(remaining) > 0;
+      say(hasCandidates ? 'กด SPIN แล้วกด STOP เพื่อจับรางวัล' : 'ไม่มีเลขคูปองที่ตรงกับรายการและยังไม่ได้จับรางวัล');
+      updateControls();
+    }
+    function spinDigits(now) {
+      if (!isSpinning) return;
+      if (now - lastRollAt >= 72) {
+        for (const reel of reels) reel.textContent = String(Math.floor(Math.random() * 10));
+        lastRollAt = now;
+      }
+      animationFrame = requestAnimationFrame(spinDigits);
+    }
+    function settleDigits(code) {
+      cancelAnimationFrame(animationFrame);
+      const digits = String(code || '').padStart(6,'0').slice(-6);
+      reels.forEach((reel,index) => {
+        reel.textContent = digits[index];
+        reel.classList.remove('rolling');
+      });
+    }
+    function startSpin() {
+      if (isSpinning || isStopping || !drawEvent || !nameField || !drawReady || !hasCandidates) return;
+      isSpinning = true;
+      nameDisplay.textContent = '';
+      nameDisplay.className = '';
+      reels.forEach(reel => reel.classList.add('rolling'));
+      stageCaption.textContent = `${drawEvent} · กำลังหมุนเลข 6 หลัก`;
+      say('หมุนอยู่ กด STOP เพื่อจับรางวัล');
+      updateControls();
+      lastRollAt = 0;
+      animationFrame = requestAnimationFrame(spinDigits);
+    }
+    async function stopSpin() {
+      if (!isSpinning || isStopping) return;
+      isStopping = true;
+      updateControls();
+      say('กำลังยืนยันเลขและค้นหาชื่อผู้ถือรหัส...');
+      try {
+        const {data,error} = await _supabase.rpc('coupon_draw_winner',{
+          p_event:drawEvent,
+          p_field:nameField
+        });
+        if (error) throw error;
+        const winner = Array.isArray(data) ? data[0] : data;
+        if (!winner) {
+          isSpinning = false;
+          isStopping = false;
+          resetReels();
+          nameDisplay.textContent = 'ไม่มีเลขที่เหลือ';
+          drawReady = false;
+          hasCandidates = false;
+          say('ไม่มีเลขคูปองที่ใช้จับรางวัลได้');
+          updateControls();
+          return;
+        }
+        if (!/^\d{6}$/.test(winner.coupon_code || '') || !winner.display_name) {
+          throw new Error('ข้อมูลผู้ชนะไม่ครบหรือรหัสไม่ใช่ตัวเลข 6 หลัก');
+        }
+        isSpinning = false;
+        settleDigits(winner.coupon_code);
+        drawReady = true;
+        hasCandidates = Number(winner.remaining_count) > 0;
+        stageCaption.textContent = `${drawEvent} · ผลการจับรางวัล`;
+        nameDisplay.textContent = 'เลขที่ออก';
+        say(`รหัส ${winner.coupon_code}`);
+        window.setTimeout(() => {
+          nameDisplay.textContent = winner.display_name;
+          nameDisplay.className = 'announced';
+          isStopping = false;
+          say(`รหัส ${winner.coupon_code} · ${winner.display_name}`);
+          updateControls();
+        },600);
+        updateControls();
+        return;
+      } catch (error) {
+        console.error('Unable to draw coupon winner',error);
+        isSpinning = false;
+        isStopping = false;
+        reels.forEach(reel => reel.classList.remove('rolling'));
+        nameDisplay.textContent = 'จับรางวัลไม่สำเร็จ';
+        say('ตรวจสอบ migration และสิทธิ์ RPC ใน supabase/coupon_draw_entries.sql');
+      }
+      updateControls();
+    }
+    spinButton.addEventListener('click',startSpin);
+    stopButton.addEventListener('click',stopSpin);
+    document.addEventListener('keydown',event => {
+      if ((event.key === 'l' || event.key === 'L') && isSpinning) stopSpin();
+    });
+    document.addEventListener('DOMContentLoaded',() => {
+      loadEventConfig().catch(error => {
+        console.error('Unable to load draw event',error);
+        say(error.message || 'โหลดข้อมูลงานไม่สำเร็จ');
+      });
+    });
+  </script>
+</body>
+</html>

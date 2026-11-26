@@ -21,6 +21,10 @@
     input { display: block; width: min(590px, 100%); border: 0; border-bottom: 2px solid #ddd; border-radius: 0; background: transparent; padding: 10px 0; color: #222; font: inherit; font-size: clamp(20px, 2.2vw, 28px); }
     input:focus { outline: none; border-color: #969b20; }
     input[aria-invalid="true"] { border-color: #d9392c; }
+    select { display: block; width: min(590px, 100%); border: 0; border-bottom: 2px solid #ddd; border-radius: 0; background: transparent; padding: 10px 0; color: #222; font: inherit; font-size: clamp(20px, 2.2vw, 28px); }
+    select:focus { outline: none; border-color: #969b20; }
+    .extra-question { padding: 34px 46px 42px; }
+    .extra-question label { margin-bottom: 18px; }
     .actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; }
     button { font: inherit; font-size: 22px; cursor: pointer; border: 0; border-radius: 7px; padding: 17px 46px; }
     button[type="submit"] { background: #a2a729; color: white; }
@@ -44,6 +48,7 @@
       <p class="required-note">* ระบุว่าเป็นคำถามที่จำเป็น</p>
     </section>
     <form id="coupon-form">
+      <div id="extra-fields"></div>
       <div class="card question">
         <label for="coupon">กรอกรหัส 6ตัว ในคูปอง <span class="required">*</span></label>
         <input id="coupon" name="coupon" type="text" required minlength="6" maxlength="6" pattern="[A-Za-z0-9]{6,7}" placeholder="คำตอบของคุณ" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="status" title="กรอกรหัสตัวอักษรภาษาอังกฤษหรือตัวเลข 6–7 ตัว">
